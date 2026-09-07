@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: vinay-trade-tracker
+    env: node
+    buildCommand: npm install --production
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 22.12.0
+      - key: PORT
+        value: 10000

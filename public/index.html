@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Trade Pulse — Live Market Chat Assistant</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#090d16">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand">
+        <div class="pulse-indicator"></div>
+        <div>
+          <h1>Trade Pulse</h1>
+          <span class="sub-text">AI Market Chat & 10:00 AM Opinion</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="installBtn" class="install-btn" style="display: none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          <span>Install App</span>
+        </button>
+        <button id="refreshDataBtn" class="icon-btn" title="Refresh Live Data" onclick="fetchLiveTickers()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Live Market Ticker Mini-Strip -->
+  <div class="ticker-strip" id="tickerStrip">
+    <div class="ticker-item">
+      <span class="t-sym">BHARTIARTL</span>
+      <span class="t-price" id="airtelLtp">₹1,840.00</span>
+      <span class="t-badge badge-green" id="airtelBadge">BUY ZONE</span>
+    </div>
+    <div class="ticker-item">
+      <span class="t-sym">HAL</span>
+      <span class="t-price" id="halLtp">₹4,856.00</span>
+      <span class="t-badge badge-yellow" id="halBadge">TRACK ONLY</span>
+    </div>
+    <div class="ticker-item">
+      <span class="t-sym">BALUFORGE</span>
+      <span class="t-price" id="baluLtp">₹577.25</span>
+      <span class="t-badge badge-green" id="baluBadge">+₹1,092 GAIN</span>
+    </div>
+  </div>
+
+  <!-- Chat Container -->
+  <div class="chat-container">
+    <div class="messages-stream" id="messagesStream">
+      <!-- Welcome Message -->
+      <div class="message-bubble assistant-bubble">
+        <div class="bubble-header">
+          <span class="ai-tag">⚡ Trade Pulse Engine</span>
+          <span class="timestamp">Live</span>
+        </div>
+        <div class="bubble-body">
+          <p><strong>Welcome Vinay!</strong> I am connected to live NSE market data feeds and your trade execution models.</p>
+          <p>Tomorrow from the office, tap any quick action chip below or ask me any question at <strong>10:00 AM</strong> to get a real-time <strong>GO / NO-GO</strong> recommendation.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Prompt Chips -->
+    <div class="quick-chips-wrapper">
+      <div class="chips-scroll">
+        <button class="chip" onclick="sendQuickPrompt('Give me the 10:00 AM opinion on Bharti Airtel')">⚡ 10:00 AM Airtel Verdict</button>
+        <button class="chip" onclick="sendQuickPrompt('Show me the 3-Tier Target and Stop-Loss prices')">🎯 Targets & Stop-Loss</button>
+        <button class="chip" onclick="sendQuickPrompt('What are the trap filters and when to ignore trades?')">🚫 Trap Filters</button>
+        <button class="chip" onclick="sendQuickPrompt('Check my Balu Forge 50 shares holding status')">💼 Balu Forge Holding</button>
+        <button class="chip" onclick="sendQuickPrompt('How accurate is your analysis? Show win rate statistics')">📊 Win Rate & Accuracy</button>
+      </div>
+    </div>
+
+    <!-- Message Input Bar -->
+    <div class="chat-input-bar">
+      <form id="chatForm" onsubmit="handleFormSubmit(event)">
+        <input 
+          type="text" 
+          id="userInput" 
+          placeholder="Ask for 10:00 AM analysis, price check, or exit levels..." 
+          autocomplete="off"
+        />
+        <button type="submit" id="sendBtn" class="send-btn" title="Send message">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
