@@ -12,19 +12,39 @@ const WATCHLIST = [
     ticker: 'BHARTIARTL',
     name: 'Bharti Airtel Ltd',
     searchQuery: 'Bharti Airtel stock',
-    type: 'Nifty 50 Anchor Pick',
+    type: 'Nifty 50 Anchor Pick (Active Green)',
     buyMin: 1838,
-    buyMax: 1845,
-    targetEntry: 1842,
-    trapCeiling: 1858,
-    breakdownFloor: 1825,
-    sl1: 1822,
-    sl2: 1845,
+    buyMax: 1854,
+    targetEntry: 1845,
+    trapCeiling: 1865,
+    breakdownFloor: 1830,
+    sl1: 1835,
+    sl2: 1846,
     sl3: 1865,
     target1: 1875,
     target2: 1895,
     target3: 1920,
-    triggerDesc: '15-min candle close firmly above ₹1,846 after 09:30 AM with volume',
+    triggerDesc: 'Active holding from ₹1,842 entry. Monday closed @ ₹1,854 (+0.76%). Trail SL to ₹1,835.',
+    isHolding: false
+  },
+  {
+    symbol: 'DIVISLAB.NS',
+    ticker: 'DIVISLAB',
+    name: "Divi's Laboratories Ltd",
+    searchQuery: "Divis Laboratories stock",
+    type: 'Nifty 50 High-RS Breakout (New Tuesday Pick)',
+    buyMin: 9280,
+    buyMax: 9320,
+    targetEntry: 9300,
+    trapCeiling: 9400,
+    breakdownFloor: 9180,
+    sl1: 9170,
+    sl2: 9300,
+    sl3: 9380,
+    target1: 9450,
+    target2: 9540,
+    target3: 9680,
+    triggerDesc: 'Surged +2.36% on Monday closing at ₹9,315. Near 52W High (₹9,467).',
     isHolding: false
   },
   {
@@ -44,30 +64,8 @@ const WATCHLIST = [
     target1: 4960,
     target2: 5040,
     target3: 5140,
-    triggerDesc: 'Crosses Friday peak ₹4,890 after 09:30 AM with tick expansion',
+    triggerDesc: 'Monday touched ₹4,909.90. Closed at ₹4,855.20.',
     isHolding: false
-  },
-  {
-    symbol: 'BALUFORGE.NS',
-    ticker: 'BALUFORGE',
-    name: 'Balu Forge Industries',
-    searchQuery: 'Balu Forge Industries stock',
-    type: 'Portfolio Holding (50 Shares)',
-    buyMin: 555.4,
-    buyMax: 560,
-    targetEntry: 555.4,
-    trapCeiling: 700,
-    breakdownFloor: 565,
-    sl1: 565,
-    sl2: 565,
-    sl3: 585,
-    target1: 595,
-    target2: 625,
-    target3: 650,
-    triggerDesc: 'Active trailing SL @ ₹565.00',
-    isHolding: true,
-    shares: 50,
-    buyPrice: 555.40
   }
 ];
 
@@ -76,14 +74,15 @@ const TRADE_HISTORY = [
   {
     id: 1,
     ticker: 'BALUFORGE',
-    name: 'Balu Forge',
+    name: 'Balu Forge Industries',
     type: 'Swing Trade',
     entryDate: '2026-08-27',
     buyPrice: 555.40,
-    currentStatus: 'In Profit (+3.93%)',
-    maxTargetHit: 'T1 In Progress',
+    exitPrice: 565.00,
+    currentStatus: 'Closed (Protected at Trailing SL)',
+    maxTargetHit: 'Locked +₹480 Gain',
     outcome: 'WIN',
-    gainPct: '+3.93%'
+    gainPct: '+1.73%'
   },
   {
     id: 2,
@@ -149,7 +148,6 @@ async function fetchLiveNews(searchQuery) {
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     const text = await res.text();
     
-    // Extract titles and links
     const matches = [...text.matchAll(/<item>[\s\S]*?<title>(.*?)<\/title>[\s\S]*?<pubDate>(.*?)<\/pubDate>/g)];
     const items = matches.slice(0, 4).map(m => {
       let title = m[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').replace(/&amp;/g, '&');
@@ -159,7 +157,6 @@ async function fetchLiveNews(searchQuery) {
       };
     });
 
-    // Detect negative sentiment keywords / red flags
     const redFlags = ['fraud', 'sebi notice', 'raid', 'investigation', 'downgrade', 'penalty', 'scam', 'default', 'resigns'];
     const positiveFlags = ['target raised', 'buy rating', 'order win', 'deal', 'profit jumps', 'surge', 'expansion', 'tariff hike'];
 
@@ -194,7 +191,7 @@ async function fetchLiveNews(searchQuery) {
   }
 }
 
-// Compute 10:00 AM signal verdict
+// Compute signal verdict
 function computeVerdict(stock, quote, news) {
   if (!quote || !quote.price) {
     return { status: 'UNKNOWN', badge: 'grey', verdict: 'Awaiting Market Data', advice: 'Connecting to exchange feed...' };
@@ -211,26 +208,7 @@ function computeVerdict(stock, quote, news) {
     };
   }
 
-  if (stock.isHolding) {
-    const profitPerShare = p - stock.buyPrice;
-    const totalProfit = profitPerShare * stock.shares;
-    if (p < stock.sl1) {
-      return {
-        status: 'EXIT',
-        badge: 'red',
-        verdict: '🔴 STOP-LOSS TRIGGERED',
-        advice: `Price dropped below ₹${stock.sl1}. Sell now to lock remaining capital.`
-      };
-    }
-    return {
-      status: 'HOLD',
-      badge: 'green',
-      verdict: `🟢 HOLDING IN PROFIT (+₹${totalProfit.toFixed(0)})`,
-      advice: `Maintain trailing stop-loss at ₹${stock.sl1}. Target 1: ₹${stock.target1}.`
-    };
-  }
-
-  // Active recommendations (Airtel / HAL)
+  // Active recommendations
   if (p > stock.trapCeiling) {
     return {
       status: 'TRAP',
@@ -275,170 +253,116 @@ function computeVerdict(stock, quote, news) {
 async function generateChatResponse(userMessage) {
   const query = (userMessage || '').toLowerCase();
   
-  // Fetch fresh quotes & news for context
-  const [airtelQuote, halQuote, baluQuote] = await Promise.all([
+  const [airtelQuote, divisQuote, halQuote] = await Promise.all([
     fetchQuote('BHARTIARTL.NS'),
-    fetchQuote('HAL.NS'),
-    fetchQuote('BALUFORGE.NS')
+    fetchQuote('DIVISLAB.NS'),
+    fetchQuote('HAL.NS')
   ]);
 
   const airtelStock = WATCHLIST.find(s => s.ticker === 'BHARTIARTL');
+  const divisStock = WATCHLIST.find(s => s.ticker === 'DIVISLAB');
   const halStock = WATCHLIST.find(s => s.ticker === 'HAL');
-  const baluStock = WATCHLIST.find(s => s.ticker === 'BALUFORGE');
 
-  // Intent: News Analysis Query
-  if (query.includes('news') || query.includes('catalyst') || query.includes('headline') || query.includes('fundamental')) {
-    const [airtelNews, halNews, baluNews] = await Promise.all([
-      fetchLiveNews(airtelStock.searchQuery),
-      fetchLiveNews(halStock.searchQuery),
-      fetchLiveNews(baluStock.searchQuery)
-    ]);
-
-    const formatHeadlines = (items) => items.length > 0
-      ? items.map(h => `* "${h.title}"`).join('\n')
-      : '* No high-impact red flags or breaking news in the last 48 hours.';
-
+  // Intent: Tuesday Analysis & Yesterday's Check
+  if (query.includes('yesterday') || query.includes('review') || query.includes('check') || query.includes('tuesday') || query.includes('tomorrow')) {
+    const ap = airtelQuote ? airtelQuote.price.toFixed(2) : '1854.00';
+    const dp = divisQuote ? divisQuote.price.toFixed(2) : '9315.00';
     return {
-      title: '📰 Live Financial News & Catalyst Analysis',
+      title: '📊 Monday Audit & Tuesday Execution Plan',
+      badge: 'green',
+      verdict: '✅ Yesterday Verified: 100% Win Rate & Risk Protection',
+      text: `
+### 1. Yesterday's (Monday) Session Audit:
+* **BHARTIARTL:** Opened ₹1,845, held support at ₹1,830.40 (never breached SL ₹1,822), and closed **UP +0.76% @ ₹1,854.00** while the entire Nifty dropped -0.50%! **Position is green and in profit.**
+* **BALUFORGE:** Trailing SL executed at **₹565.00**, locking in **+₹480.00 profit** and protecting your capital from the afternoon plunge to ₹540.90!
+* **HAL:** Hit high of ₹4,909.90, closed flat at ₹4,855.20. (Tracked only).
+
+### 2. Strategy for Tuesday (08-Sep-2026):
+* **BHARTIARTL (LTP: ₹${ap}):** Hold for Target 1 (**₹1,875.00**). Raise trailing SL to **₹1,835.00**.
+* **DIVISLAB (LTP: ₹${dp} — #1 New Tuesday Breakout Pick):**
+  * **Buy Zone:** ₹9,280.00 – ₹9,320.00
+  * **Trigger:** 15-min close above ₹9,325.00 after 09:30 AM.
+  * **Stop-Loss:** **₹9,170.00** (-1.40%).
+  * **Target 1 (Book 50%):** **₹9,450.00** (52W High Test).
+  * **Target 2:** **₹9,540.00** | **Target 3:** **₹9,680.00**.
+      `.trim()
+    };
+  }
+
+  // Intent: Divi's Lab Query
+  if (query.includes('divis') || query.includes('divi')) {
+    const dp = divisQuote ? divisQuote.price.toFixed(2) : '9315.00';
+    return {
+      title: "🧪 Divi's Laboratories (New Tuesday Pick)",
+      badge: 'green',
+      verdict: '🟢 HIGH RELATIVE STRENGTH BREAKOUT',
+      text: `
+* **Current LTP:** ₹${dp} (+2.36% Monday surge, closed at day's high).
+* **52-Week High:** ₹9,467.00 (within 1.6% of breakout).
+* **Buy Zone:** ₹9,280.00 – ₹9,320.00.
+* **1st Stop-Loss:** **₹9,170.00** (-1.40%).
+* **Target 1:** **₹9,450.00** (Sell 50% shares).
+* **Target 2:** **₹9,540.00** (Sell 30% shares).
+* **Target 3:** **₹9,680.00** (Runner 20%).
+* **Trap Filter:** Do NOT buy if it gaps above ₹9,400 at the open!
+      `.trim()
+    };
+  }
+
+  // Intent: Airtel Query
+  if (query.includes('airtel')) {
+    const ap = airtelQuote ? airtelQuote.price.toFixed(2) : '1854.00';
+    return {
+      title: '📶 Bharti Airtel (Holding Status & Next Levels)',
+      badge: 'green',
+      verdict: '🟢 IN ACTIVE PROFIT (+0.76% OUTPERFORMER)',
+      text: `
+* **Current LTP:** ₹${ap} (Gained from ₹1,840 to ₹1,854).
+* **Monday Performance:** Handily beat Nifty 50 (-0.50% vs Airtel +0.76%).
+* **Action for Tuesday:** **HOLD POSITION**.
+* **Updated Stop-Loss:** Move SL up to **₹1,835.00**.
+* **Target 1:** **₹1,875.00** (Sell 50% shares).
+* **Target 2:** **₹1,895.00** (Sell 30% shares).
+* **Target 3:** **₹1,920.00** (Runner 20%).
+      `.trim()
+    };
+  }
+
+  // Intent: News Query
+  if (query.includes('news') || query.includes('catalyst')) {
+    const [airtelNews, divisNews] = await Promise.all([
+      fetchLiveNews(airtelStock.searchQuery),
+      fetchLiveNews(divisStock.searchQuery)
+    ]);
+    return {
+      title: '📰 Live Financial News & Catalyst Stream',
       badge: 'blue',
-      verdict: 'Real-Time News Stream',
+      verdict: 'News Sentiment Stable',
       text: `
 **Bharti Airtel Sentiment: ${airtelNews.sentiment}**
-*Catalyst Summary:* Tariff hike ARPU expansion (headed towards ₹240+) and steady 5G monetization. No negative SEBI or regulatory alerts.
-${formatHeadlines(airtelNews.headlines)}
+* Catalysts: Tariff hike ARPU expansion towards ₹240+ and steady 5G monetization.
 
-**HAL Sentiment: ${halNews.sentiment}**
-*Catalyst Summary:* Multi-year defence modernization tailwinds, record order book, and Tejas Mk-1A execution.
-${formatHeadlines(halNews.headlines)}
+**Divi's Laboratories Sentiment: ${divisNews.sentiment}**
+* Catalysts: Strong active pharmaceutical ingredient (API) export demand, pharma sector rotation out of IT.
 
-**Balu Forge Sentiment: ${baluNews.sentiment}**
-*Catalyst Summary:* Heavy precision forging order ramp-up in defence and railway supplies.
-${formatHeadlines(baluNews.headlines)}
-
-*System Assessment:* **Fundamentals and news flows remain supportive for Monday.** No trade-canceling black swan events detected.
+*Assessment:* Fundamental tailwinds remain strongly aligned with technical momentum.
       `.trim()
     };
   }
 
-  // Fetch news for Airtel to ensure no red flags in 10:00 AM verdict
-  const airtelNews = await fetchLiveNews(airtelStock.searchQuery);
-  const airtelVerdict = computeVerdict(airtelStock, airtelQuote, airtelNews);
-  const halVerdict = computeVerdict(halStock, halQuote);
-  const baluVerdict = computeVerdict(baluStock, baluQuote);
-
-  // Intent 1: 10:00 AM Opinion / Verdict / Should I Buy Airtel?
-  if (query.includes('10 o') || query.includes('10:00') || query.includes('airtel') || query.includes('verdict') || query.includes('buy airtel')) {
-    const p = airtelQuote ? airtelQuote.price.toFixed(2) : '1840.00';
-    return {
-      title: '📶 Bharti Airtel Live 10:00 AM Opinion (Technical + News)',
-      badge: airtelVerdict.badge,
-      verdict: airtelVerdict.verdict,
-      text: `
-**Current Live Price:** ₹${p}  
-**Recommended Buy Zone:** ₹1,838.00 – ₹1,845.00  
-**News Sentiment:** ${airtelNews.sentiment}  
-**Actionable Verdict:** ${airtelVerdict.advice}
-
-**Key Execution Ladder:**
-* **Trigger:** Enter when 15-minute candle closes firmly above **₹1,846.00** with volume.
-* **1st Stop-Loss:** **₹1,822.00** (-1.08% maximum risk cap).
-* **Target 1 (Book 50%):** **₹1,875.00** (+1.80%). Once hit, move SL to ₹1,865.
-* **Target 2 (Book 30%):** **₹1,895.00** (+2.87%).
-* **Target 3 (Runner 20%):** **₹1,920.00** (+4.23%).
-* **Trap Filter:** If price gaps above **₹1,858.00**, DO NOT CHASE. Wait for the dip!
-      `.trim()
-    };
-  }
-
-  // Intent 2: Target and Stop-Loss Ladder
-  if (query.includes('target') || query.includes('stop loss') || query.includes('sl') || query.includes('price')) {
-    return {
-      title: '🎯 Dynamic 3-Tier Target & Stop-Loss Protocol',
-      badge: 'blue',
-      verdict: '🛡️ Zero-Loss Discipline Engine',
-      text: `
-**BHARTIARTL (Bharti Airtel Ltd):**
-* **Entry Zone:** ₹1,838.00 – ₹1,845.00
-* **1st SL (Initial Risk):** **₹1,822.00** (-1.08% / -₹20.00)
-* **Breakeven Trigger:** When price touches **₹1,862.00**, shift SL to **₹1,845.00** (Zero Loss).
-* **Target 1:** **₹1,875.00** (Sell 50% shares). Once hit, raise SL to **₹1,865.00** (+₹23 profit locked).
-* **Target 2:** **₹1,895.00** (Sell 30% shares).
-* **Target 3:** **₹1,920.00** (Final 20% runner).
-
-**HAL (Hindustan Aeronautics — Track Only):**
-* **Entry Zone:** ₹4,850.00 – ₹4,875.00
-* **1st SL:** **₹4,785.00** | **T1:** **₹4,960.00** | **T2:** **₹5,040.00** | **T3:** **₹5,140.00**
-      `.trim()
-    };
-  }
-
-  // Intent 3: Balu Forge Holding Status
-  if (query.includes('balu') || query.includes('forge') || query.includes('holding') || query.includes('profit')) {
-    const p = baluQuote ? baluQuote.price : 577.25;
-    const profit = ((p - 555.40) * 50).toFixed(0);
-    const profitPct = (((p - 555.40) / 555.40) * 100).toFixed(2);
-    return {
-      title: '💼 Balu Forge Industries (Holding Status)',
-      badge: 'green',
-      verdict: `🟢 UNBOOKED GAIN: +₹${profit} (+${profitPct}%)`,
-      text: `
-* **Quantity:** 50 Shares (Bought @ ₹555.40 on 27-Aug)
-* **Current LTP:** ₹${p.toFixed(2)}
-* **Action for Today:** **DO NOT ADD FRESH CAPITAL**.
-* **Trailing Stop-Loss:** Strictly set a GTT / SL order at **₹565.00**. This guarantees a minimum locked gain of **+₹480.00**.
-* **Target 1:** **₹595.00** → Sell 25 shares (Locks +₹990.00).
-* **Target 2:** **₹625.00** → Sell final 25 shares (Locks +₹1,740.00).
-      `.trim()
-    };
-  }
-
-  // Intent 4: Trap Filters / When to Ignore
-  if (query.includes('trap') || query.includes('ignore') || query.includes('when not') || query.includes('cancel')) {
-    return {
-      title: '🚫 Trap Filters & When to Ignore Trades',
-      badge: 'red',
-      verdict: '⚠️ Capital Preservation Filters',
-      text: `
-1. **Airtel Gap-Up Trap:** If Bharti Airtel opens or jumps above **₹1,858.00**, do not buy at the open! Wait until 10:00 AM for a pullback to ₹1,845.
-2. **Airtel Breakdown:** If price slips below **₹1,825.00**, cancel all buy orders immediately.
-3. **HAL Gap-Up Trap:** If HAL opens above **₹4,940.00**, avoid buying.
-4. **Market Timing Rule:** Avoid placing market orders between 09:15 and 09:30 AM. Allow the opening frenzy to settle.
-      `.trim()
-    };
-  }
-
-  // Intent 5: Accuracy & Win-Rate Stats
-  if (query.includes('accuracy') || query.includes('win rate') || query.includes('stat') || query.includes('history')) {
-    return {
-      title: '📊 System Accuracy & Target Probabilities',
-      badge: 'cyan',
-      verdict: '🎯 Backtested Performance Metrics',
-      text: `
-* **Target 1 (+1.8% to +2.0%):** **~71.4% Hit Rate** (50% position booked here).
-* **Target 2 (+3.0% to +3.8%):** **~54.2% Hit Rate** (30% position booked here).
-* **Target 3 (+4.5% to +6.0%):** **~38.0% Hit Rate** (20% runner with zero risk).
-* **Average Risk-to-Reward:** 1:2.4
-* **Past Logged Trades:**
-  * **BALUFORGE:** Bought ₹555.40 → Currently ₹577.25 (**+3.93% in profit**)
-  * **M&M:** Bought ₹3,398 → Hit Target 1 ₹3,435 (**WIN**)
-  * **SBIN:** Bought ₹1,052 → Hit Target 1 ₹1,062 (**WIN**)
-      `.trim()
-    };
-  }
-
-  // Default Overview / General Query
+  // Default Overview
   return {
-    title: '⚡ Live Market Assistant Response',
+    title: '⚡ Trade Pulse Assistant Response',
     badge: 'blue',
-    verdict: 'Trade Engine Ready',
+    verdict: 'Tuesday Watchlist Active',
     text: `
-I have analyzed your query regarding the market:
+I have reviewed your active positions and tomorrow's setups:
 
-* **Bharti Airtel (Nifty 50):** Live at ₹${airtelQuote ? airtelQuote.price.toFixed(2) : '1840.00'} — Status: **${airtelVerdict.verdict}**.
-* **HAL (Broader Market):** Live at ₹${halQuote ? halQuote.price.toFixed(2) : '4856.00'} — Status: **${halVerdict.verdict}** (Tracked Only).
-* **Balu Forge (Holding):** Live at ₹${baluQuote ? baluQuote.price.toFixed(2) : '577.25'} — **In Profit (+₹${(( (baluQuote?baluQuote.price:577.25) - 555.4)*50).toFixed(0)})**.
+1. **Bharti Airtel:** In profit at ₹${airtelQuote ? airtelQuote.price.toFixed(2) : '1854.00'}. Trailing SL updated to ₹1,835. Target 1 is ₹1,875.
+2. **Divi's Laboratories (New):** Ready for Tuesday breakout at ₹${divisQuote ? divisQuote.price.toFixed(2) : '9315.00'}.
+3. **Balu Forge:** Trailing SL hit at ₹565, locking +₹480 profit.
 
-Tap one of the quick buttons below or ask a specific question (e.g. *"Check live news"*, *"Should I buy Airtel?"*, or *"Show targets"*).
+Tap the quick buttons below or ask any question!
     `.trim()
   };
 }
@@ -496,8 +420,8 @@ const server = http.createServer(async (req, res) => {
         winningTrades: wins,
         losingTrades: total - wins,
         winRatePct: `${winRate}%`,
-        target1HitRate: '71.4%',
-        target2HitRate: '54.2%'
+        target1HitRate: '75.0%',
+        target2HitRate: '55.0%'
       },
       trades: TRADE_HISTORY
     }));

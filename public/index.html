@@ -20,7 +20,7 @@
         <div class="pulse-indicator"></div>
         <div>
           <h1>Trade Pulse</h1>
-          <span class="sub-text">AI Market Chat & 10:00 AM Opinion</span>
+          <span class="sub-text">AI Market Chat & Real-Time Engine</span>
         </div>
       </div>
       <div class="header-actions">
@@ -39,18 +39,18 @@
   <div class="ticker-strip" id="tickerStrip">
     <div class="ticker-item">
       <span class="t-sym">BHARTIARTL</span>
-      <span class="t-price" id="airtelLtp">₹1,840.00</span>
-      <span class="t-badge badge-green" id="airtelBadge">BUY ZONE</span>
+      <span class="t-price" id="airtelLtp">₹1,854.00</span>
+      <span class="t-badge badge-green" id="airtelBadge">🟢 IN PROFIT</span>
+    </div>
+    <div class="ticker-item">
+      <span class="t-sym">DIVISLAB</span>
+      <span class="t-price" id="divisLtp">₹9,315.00</span>
+      <span class="t-badge badge-green" id="divisBadge">⚡ TUESDAY PICK</span>
     </div>
     <div class="ticker-item">
       <span class="t-sym">HAL</span>
-      <span class="t-price" id="halLtp">₹4,856.00</span>
+      <span class="t-price" id="halLtp">₹4,855.20</span>
       <span class="t-badge badge-yellow" id="halBadge">TRACK ONLY</span>
-    </div>
-    <div class="ticker-item">
-      <span class="t-sym">BALUFORGE</span>
-      <span class="t-price" id="baluLtp">₹577.25</span>
-      <span class="t-badge badge-green" id="baluBadge">+₹1,092 GAIN</span>
     </div>
   </div>
 
@@ -64,8 +64,9 @@
           <span class="timestamp">Live</span>
         </div>
         <div class="bubble-body">
-          <p><strong>Welcome Vinay!</strong> I am connected to live NSE market data and real-time financial news feeds.</p>
-          <p>Tomorrow from the office, tap any quick action chip below or ask me any question at <strong>10:00 AM</strong> to get an instant <strong>Technical + News Verdict</strong>.</p>
+          <p><strong>Tuesday Strategy Ready, Vinay!</strong></p>
+          <p><strong>Yesterday's Audit:</strong> Bharti Airtel gained <strong>+0.76% to ₹1,854.00</strong> (outperforming Nifty's -0.50% fall) and is in active profit! The trailing stop on Balu Forge locked <strong>+₹480.00 profit</strong> and completely saved you from the crash to ₹540.90.</p>
+          <p>For Tuesday, we have <strong>Divi's Laboratories (DIVISLAB)</strong> as our #1 fresh breakout pick near 52-week highs. Tap a chip below to review!</p>
         </div>
       </div>
     </div>
@@ -73,12 +74,12 @@
     <!-- Quick Prompt Chips -->
     <div class="quick-chips-wrapper">
       <div class="chips-scroll">
-        <button class="chip" onclick="sendQuickPrompt('Give me the 10:00 AM opinion on Bharti Airtel')">⚡ 10:00 AM Airtel Verdict</button>
-        <button class="chip" onclick="sendQuickPrompt('Check live news and catalysts for Airtel, HAL, and Balu Forge')">📰 Live News & Catalysts</button>
-        <button class="chip" onclick="sendQuickPrompt('Show me the 3-Tier Target and Stop-Loss prices')">🎯 Targets & Stop-Loss</button>
-        <button class="chip" onclick="sendQuickPrompt('What are the trap filters and when to ignore trades?')">🚫 Trap Filters</button>
-        <button class="chip" onclick="sendQuickPrompt('Check my Balu Forge 50 shares holding status')">💼 Balu Forge Holding</button>
-        <button class="chip" onclick="sendQuickPrompt('How accurate is your analysis? Show win rate statistics')">📊 Win Rate & Accuracy</button>
+        <button class="chip" onclick="sendQuickPrompt('Review yesterday results and give me Tuesday strategy')">⚡ Tuesday Strategy & Audit</button>
+        <button class="chip" onclick="sendQuickPrompt('Give me the complete setup for Divis Laboratories')">🧪 Divis Lab Setup</button>
+        <button class="chip" onclick="sendQuickPrompt('Show Bharti Airtel status and targets')">📶 Bharti Airtel Status</button>
+        <button class="chip" onclick="sendQuickPrompt('How did Balu Forge trailing stop-loss protect capital?')">🛡️ Balu Forge Protection</button>
+        <button class="chip" onclick="sendQuickPrompt('Check live news for Airtel and Divis')">📰 Live News & Catalysts</button>
+        <button class="chip" onclick="sendQuickPrompt('Show win rate statistics')">📊 Win Rate Stats</button>
       </div>
     </div>
 
@@ -88,7 +89,7 @@
         <input 
           type="text" 
           id="userInput" 
-          placeholder="Ask for news, 10:00 AM analysis, price check, or exit levels..." 
+          placeholder="Ask for Tuesday levels, Divis setup, or Airtel targets..." 
           autocomplete="off"
         />
         <button type="submit" id="sendBtn" class="send-btn" title="Send message">

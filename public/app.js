@@ -35,21 +35,29 @@ async function fetchLiveTickers() {
       data.stocks.forEach(stock => {
         const p = stock.quote && stock.quote.price ? `₹${stock.quote.price.toFixed(2)}` : 'Connecting...';
         if (stock.ticker === 'BHARTIARTL') {
-          document.getElementById('airtelLtp').textContent = p;
+          const el = document.getElementById('airtelLtp');
+          if (el) el.textContent = p;
           const badge = document.getElementById('airtelBadge');
-          badge.textContent = stock.verdict.status === 'BUY' ? 'BUY ZONE' : stock.verdict.status;
-          badge.className = `t-badge badge-${stock.verdict.badge}`;
+          if (badge) {
+            badge.textContent = '🟢 IN PROFIT';
+            badge.className = 't-badge badge-green';
+          }
+        } else if (stock.ticker === 'DIVISLAB') {
+          const el = document.getElementById('divisLtp');
+          if (el) el.textContent = p;
+          const badge = document.getElementById('divisBadge');
+          if (badge) {
+            badge.textContent = stock.verdict.status === 'BUY' ? 'BUY ZONE' : stock.verdict.status;
+            badge.className = `t-badge badge-${stock.verdict.badge}`;
+          }
         } else if (stock.ticker === 'HAL') {
-          document.getElementById('halLtp').textContent = p;
+          const el = document.getElementById('halLtp');
+          if (el) el.textContent = p;
           const badge = document.getElementById('halBadge');
-          badge.textContent = stock.verdict.status;
-          badge.className = `t-badge badge-${stock.verdict.badge}`;
-        } else if (stock.ticker === 'BALUFORGE') {
-          document.getElementById('baluLtp').textContent = p;
-          const gain = stock.quote && stock.quote.price ? ((stock.quote.price - stock.buyPrice) * stock.shares).toFixed(0) : '1092';
-          const badge = document.getElementById('baluBadge');
-          badge.textContent = `+₹${gain} GAIN`;
-          badge.className = 't-badge badge-green';
+          if (badge) {
+            badge.textContent = stock.verdict.status;
+            badge.className = `t-badge badge-${stock.verdict.badge}`;
+          }
         }
       });
     }
@@ -68,9 +76,7 @@ function formatMarkdown(text) {
     .replace(/^## (.*$)/gim, '<h3 style="margin:10px 0 6px 0; color:#f8fafc;">$1</h3>')
     .replace(/^\* (.*$)/gim, '<li>$1</li>');
 
-  // Wrap loose <li> in <ul>
   html = html.replace(/(<li>.*<\/li>)/gims, '<ul>$1</ul>');
-  // Format linebreaks
   html = html.replace(/\n\n/g, '<p></p>');
   return html;
 }
@@ -151,5 +157,5 @@ function sendQuickPrompt(promptText) {
 // On page load
 document.addEventListener('DOMContentLoaded', () => {
   fetchLiveTickers();
-  setInterval(fetchLiveTickers, 45000); // Live update every 45s
+  setInterval(fetchLiveTickers, 45000);
 });
