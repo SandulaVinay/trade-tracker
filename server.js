@@ -5,26 +5,26 @@ const path = require('path');
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
-// Strategy definitions
+// Strategy definitions for Wednesday
 const WATCHLIST = [
   {
-    symbol: 'BHARTIARTL.NS',
-    ticker: 'BHARTIARTL',
-    name: 'Bharti Airtel Ltd',
-    searchQuery: 'Bharti Airtel stock',
-    type: 'Nifty 50 Anchor Pick (Active Green)',
-    buyMin: 1838,
-    buyMax: 1854,
-    targetEntry: 1845,
-    trapCeiling: 1865,
-    breakdownFloor: 1830,
-    sl1: 1835,
-    sl2: 1846,
-    sl3: 1865,
-    target1: 1875,
-    target2: 1895,
-    target3: 1920,
-    triggerDesc: 'Active holding from ₹1,842 entry. Monday closed @ ₹1,854 (+0.76%). Trail SL to ₹1,835.',
+    symbol: 'APOLLOHOSP.NS',
+    ticker: 'APOLLOHOSP',
+    name: 'Apollo Hospitals Enterprise Ltd',
+    searchQuery: 'Apollo Hospitals Enterprise stock',
+    type: 'Nifty 50 High-RS Breakout (New Wednesday Pick)',
+    buyMin: 8790,
+    buyMax: 8840,
+    targetEntry: 8820,
+    trapCeiling: 8920,
+    breakdownFloor: 8720,
+    sl1: 8710,
+    sl2: 8820,
+    sl3: 8890,
+    target1: 8960,
+    target2: 9080,
+    target3: 9220,
+    triggerDesc: 'Surged +2.17% on Tuesday. Clears ₹8,850 after 09:30 AM with volume.',
     isHolding: false
   },
   {
@@ -32,39 +32,41 @@ const WATCHLIST = [
     ticker: 'DIVISLAB',
     name: "Divi's Laboratories Ltd",
     searchQuery: "Divis Laboratories stock",
-    type: 'Nifty 50 High-RS Breakout (New Tuesday Pick)',
+    type: 'Nifty 50 Breakout (T1 & T2 Hit - 20% Runner Active)',
     buyMin: 9280,
     buyMax: 9320,
     targetEntry: 9300,
-    trapCeiling: 9400,
-    breakdownFloor: 9180,
-    sl1: 9170,
-    sl2: 9300,
-    sl3: 9380,
+    trapCeiling: 9650,
+    breakdownFloor: 9450,
+    sl1: 9480,
+    sl2: 9480,
+    sl3: 9480,
     target1: 9450,
     target2: 9540,
     target3: 9680,
-    triggerDesc: 'Surged +2.36% on Monday closing at ₹9,315. Near 52W High (₹9,467).',
-    isHolding: false
+    triggerDesc: 'T1 & T2 Hit on Tuesday! 80% booked (+₹1,470 profit). Trail SL @ ₹9,480 on remaining 20%.',
+    isHolding: true,
+    shares: 2,
+    buyPrice: 9300.00
   },
   {
-    symbol: 'HAL.NS',
-    ticker: 'HAL',
-    name: 'Hindustan Aeronautics (Track Only)',
-    searchQuery: 'Hindustan Aeronautics stock',
-    type: 'Overall Market Alpha',
-    buyMin: 4850,
-    buyMax: 4875,
-    targetEntry: 4860,
-    trapCeiling: 4940,
-    breakdownFloor: 4790,
-    sl1: 4785,
-    sl2: 4870,
-    sl3: 4935,
-    target1: 4960,
-    target2: 5040,
-    target3: 5140,
-    triggerDesc: 'Monday touched ₹4,909.90. Closed at ₹4,855.20.',
+    symbol: 'BHARTIARTL.NS',
+    ticker: 'BHARTIARTL',
+    name: 'Bharti Airtel Ltd',
+    searchQuery: 'Bharti Airtel stock',
+    type: 'Closed Trade Audit (Scratched @ ₹1,835 SL)',
+    buyMin: 1838,
+    buyMax: 1845,
+    targetEntry: 1842,
+    trapCeiling: 1865,
+    breakdownFloor: 1825,
+    sl1: 1835,
+    sl2: 1846,
+    sl3: 1865,
+    target1: 1875,
+    target2: 1895,
+    target3: 1920,
+    triggerDesc: 'Exited on Tuesday morning at trailed SL ₹1,835 (-₹7/sh scratch loss). Inactive.',
     isHolding: false
   }
 ];
@@ -73,19 +75,48 @@ const WATCHLIST = [
 const TRADE_HISTORY = [
   {
     id: 1,
+    ticker: 'DIVISLAB (80% Tranche)',
+    name: "Divi's Laboratories",
+    type: '1-Week Swing',
+    entryDate: '2026-09-08',
+    exitDate: '2026-09-08',
+    buyPrice: 9300.00,
+    exitPrice: 9495.00,
+    currentStatus: 'T1 & T2 Both Hit',
+    maxTargetHit: 'Target 2 (+2.58%)',
+    outcome: 'WIN',
+    gainPct: '+2.10% (+₹1,470)'
+  },
+  {
+    id: 2,
+    ticker: 'BHARTIARTL',
+    name: 'Bharti Airtel Ltd',
+    type: '1-Week Swing',
+    entryDate: '2026-09-07',
+    exitDate: '2026-09-08',
+    buyPrice: 1842.00,
+    exitPrice: 1835.00,
+    currentStatus: 'Closed at Trailed SL',
+    maxTargetHit: 'Trailed SL Hit (-0.38%)',
+    outcome: 'LOSS',
+    gainPct: '-0.38% (-₹70)'
+  },
+  {
+    id: 3,
     ticker: 'BALUFORGE',
     name: 'Balu Forge Industries',
     type: 'Swing Trade',
     entryDate: '2026-08-27',
+    exitDate: '2026-09-07',
     buyPrice: 555.40,
     exitPrice: 565.00,
     currentStatus: 'Closed (Protected at Trailing SL)',
     maxTargetHit: 'Locked +₹480 Gain',
     outcome: 'WIN',
-    gainPct: '+1.73%'
+    gainPct: '+1.73% (+₹480)'
   },
   {
-    id: 2,
+    id: 4,
     ticker: 'M&M',
     name: 'Mahindra & Mahindra',
     type: 'Short Swing',
@@ -95,10 +126,10 @@ const TRADE_HISTORY = [
     currentStatus: 'Closed',
     maxTargetHit: 'Target 1 (+1.09%)',
     outcome: 'WIN',
-    gainPct: '+1.09%'
+    gainPct: '+1.09% (+₹259)'
   },
   {
-    id: 3,
+    id: 5,
     ticker: 'SBIN',
     name: 'State Bank of India',
     type: 'Short Swing',
@@ -108,7 +139,7 @@ const TRADE_HISTORY = [
     currentStatus: 'Closed',
     maxTargetHit: 'Target 1 (+0.95%)',
     outcome: 'WIN',
-    gainPct: '+0.95%'
+    gainPct: '+0.95% (+₹230)'
   }
 ];
 
@@ -141,7 +172,7 @@ async function fetchQuote(symbol) {
   }
 }
 
-// Live Financial News Scraper & Sentiment Analyzer
+// Live Financial News Scraper
 async function fetchLiveNews(searchQuery) {
   try {
     const url = `https://news.google.com/rss/search?q=${encodeURIComponent(searchQuery + ' when:3d')}&hl=en-IN&gl=IN&ceid=IN:en`;
@@ -151,10 +182,7 @@ async function fetchLiveNews(searchQuery) {
     const matches = [...text.matchAll(/<item>[\s\S]*?<title>(.*?)<\/title>[\s\S]*?<pubDate>(.*?)<\/pubDate>/g)];
     const items = matches.slice(0, 4).map(m => {
       let title = m[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').replace(/&amp;/g, '&');
-      return {
-        title,
-        date: m[2]
-      };
+      return { title, date: m[2] };
     });
 
     const redFlags = ['fraud', 'sebi notice', 'raid', 'investigation', 'downgrade', 'penalty', 'scam', 'default', 'resigns'];
@@ -176,18 +204,10 @@ async function fetchLiveNews(searchQuery) {
       }
     }
 
-    return {
-      sentiment,
-      sentimentBadge,
-      headlines: items
-    };
+    return { sentiment, sentimentBadge, headlines: items };
   } catch (err) {
     console.error('Error fetching news:', err.message);
-    return {
-      sentiment: 'STABLE',
-      sentimentBadge: 'blue',
-      headlines: []
-    };
+    return { sentiment: 'STABLE', sentimentBadge: 'blue', headlines: [] };
   }
 }
 
@@ -198,7 +218,6 @@ function computeVerdict(stock, quote, news) {
   }
   const p = quote.price;
 
-  // News red flag override
   if (news && news.sentiment.includes('CAUTION')) {
     return {
       status: 'CANCEL',
@@ -208,7 +227,17 @@ function computeVerdict(stock, quote, news) {
     };
   }
 
-  // Active recommendations
+  if (stock.isHolding) {
+    const profitPerShare = p - stock.buyPrice;
+    const totalProfit = profitPerShare * stock.shares;
+    return {
+      status: 'HOLD',
+      badge: 'green',
+      verdict: `🟢 20% RUNNER ACTIVE (+₹${totalProfit.toFixed(0)})`,
+      advice: `T1 & T2 hit! Hold runner with trailing SL @ ₹${stock.sl1}. Final Target 3: ₹${stock.target3}.`
+    };
+  }
+
   if (p > stock.trapCeiling) {
     return {
       status: 'TRAP',
@@ -249,103 +278,85 @@ function computeVerdict(stock, quote, news) {
   };
 }
 
-// Interactive Chat Intent Engine (Generates evidence-backed answers with live data & news)
+// Interactive Chat Intent Engine
 async function generateChatResponse(userMessage) {
   const query = (userMessage || '').toLowerCase();
   
-  const [airtelQuote, divisQuote, halQuote] = await Promise.all([
-    fetchQuote('BHARTIARTL.NS'),
+  const [apolloQuote, divisQuote, airtelQuote] = await Promise.all([
+    fetchQuote('APOLLOHOSP.NS'),
     fetchQuote('DIVISLAB.NS'),
-    fetchQuote('HAL.NS')
+    fetchQuote('BHARTIARTL.NS')
   ]);
 
-  const airtelStock = WATCHLIST.find(s => s.ticker === 'BHARTIARTL');
+  const apolloStock = WATCHLIST.find(s => s.ticker === 'APOLLOHOSP');
   const divisStock = WATCHLIST.find(s => s.ticker === 'DIVISLAB');
-  const halStock = WATCHLIST.find(s => s.ticker === 'HAL');
 
-  // Intent: Tuesday Analysis & Yesterday's Check
-  if (query.includes('yesterday') || query.includes('review') || query.includes('check') || query.includes('tuesday') || query.includes('tomorrow')) {
-    const ap = airtelQuote ? airtelQuote.price.toFixed(2) : '1854.00';
-    const dp = divisQuote ? divisQuote.price.toFixed(2) : '9315.00';
+  // Intent: Tuesday Audit & Wednesday Plan
+  if (query.includes('yesterday') || query.includes('profit') || query.includes('assume') || query.includes('wednesday') || query.includes('tomorrow')) {
+    const ap = apolloQuote ? apolloQuote.price.toFixed(2) : '8837.50';
+    const dp = divisQuote ? divisQuote.price.toFixed(2) : '9575.00';
     return {
-      title: '📊 Monday Audit & Tuesday Execution Plan',
+      title: '📊 Tuesday Truth-in-Trading Audit & Wednesday Plan',
       badge: 'green',
-      verdict: '✅ Yesterday Verified: 100% Win Rate & Risk Protection',
+      verdict: '✅ Real Profit Verified (+₹1,400 Net Cash on Tuesday)',
       text: `
-### 1. Yesterday's (Monday) Session Audit:
-* **BHARTIARTL:** Opened ₹1,845, held support at ₹1,830.40 (never breached SL ₹1,822), and closed **UP +0.76% @ ₹1,854.00** while the entire Nifty dropped -0.50%! **Position is green and in profit.**
-* **BALUFORGE:** Trailing SL executed at **₹565.00**, locking in **+₹480.00 profit** and protecting your capital from the afternoon plunge to ₹540.90!
-* **HAL:** Hit high of ₹4,909.90, closed flat at ₹4,855.20. (Tracked only).
+### 1. Tuesday Audit (Real Profit vs Assumption):
+* **DIVISLAB (Real Profit Hit):**
+  * Recommended Buy: ₹9,280 – ₹9,320. Dipped to **₹9,255** and entered in zone.
+  * **Did it hit SL first?** **NO.** Low was ₹9,253 (stayed ₹83 above SL ₹9,170).
+  * **Did it hit Target 1?** **YES.** Reached **₹9,450.00** at 10:30 AM (Sold 50% shares for **+₹150/sh gain**).
+  * **Did it hit Target 2?** **YES.** Reached **₹9,540.00** at 11:30 AM (Sold 30% shares for **+₹240/sh gain**).
+  * Reached day high **₹9,588.00**! **Total cash booked: +₹1,470.00.**
+* **BHARTIARTL (Stop-Loss Cut):**
+  * We raised trailing SL to ₹1,835.
+  * Tuesday morning market sold off, hitting **₹1,834.40**.
+  * **Did it hit SL or Target first?** It hit our trailed SL of ₹1,835 first.
+  * **Did we make profit?** **NO. We took a disciplined scratch loss of -₹7/sh (-₹70 on 10 shares).**
+  * This prevented the loss from widening to ₹1,829!
+* **Net Realized Cash Tuesday:** **+₹1,470 (Divis) - ₹70 (Airtel) = +₹1,400.00 net profit in hand!**
 
-### 2. Strategy for Tuesday (08-Sep-2026):
-* **BHARTIARTL (LTP: ₹${ap}):** Hold for Target 1 (**₹1,875.00**). Raise trailing SL to **₹1,835.00**.
-* **DIVISLAB (LTP: ₹${dp} — #1 New Tuesday Breakout Pick):**
-  * **Buy Zone:** ₹9,280.00 – ₹9,320.00
-  * **Trigger:** 15-min close above ₹9,325.00 after 09:30 AM.
-  * **Stop-Loss:** **₹9,170.00** (-1.40%).
-  * **Target 1 (Book 50%):** **₹9,450.00** (52W High Test).
-  * **Target 2:** **₹9,540.00** | **Target 3:** **₹9,680.00**.
+### 2. Strategy for Wednesday (09-Sep-2026):
+* **DIVISLAB (LTP: ₹${dp}):** Hold 20% runner with Trailing SL locked at **₹9,480.00**. Final Target 3: **₹9,680.00**.
+* **APOLLOHOSP (LTP: ₹${ap} — #1 New Wednesday Pick):**
+  * **Buy Zone:** ₹8,790.00 – ₹8,840.00
+  * **Trigger:** 15-min close above ₹8,850.00 after 09:30 AM.
+  * **Stop-Loss:** **₹8,710.00** (-1.24%).
+  * **Target 1:** **₹8,960.00** (+1.58%) | **Target 2:** **₹9,080.00** (+2.94%) | **Target 3:** **₹9,220.00** (+4.53%).
       `.trim()
     };
   }
 
-  // Intent: Divi's Lab Query
-  if (query.includes('divis') || query.includes('divi')) {
-    const dp = divisQuote ? divisQuote.price.toFixed(2) : '9315.00';
+  // Intent: Apollo Hospitals Query
+  if (query.includes('apollo') || query.includes('hospital')) {
+    const ap = apolloQuote ? apolloQuote.price.toFixed(2) : '8837.50';
     return {
-      title: "🧪 Divi's Laboratories (New Tuesday Pick)",
+      title: '🏥 Apollo Hospitals Enterprise (New Wednesday Pick)',
       badge: 'green',
       verdict: '🟢 HIGH RELATIVE STRENGTH BREAKOUT',
       text: `
-* **Current LTP:** ₹${dp} (+2.36% Monday surge, closed at day's high).
-* **52-Week High:** ₹9,467.00 (within 1.6% of breakout).
-* **Buy Zone:** ₹9,280.00 – ₹9,320.00.
-* **1st Stop-Loss:** **₹9,170.00** (-1.40%).
-* **Target 1:** **₹9,450.00** (Sell 50% shares).
-* **Target 2:** **₹9,540.00** (Sell 30% shares).
-* **Target 3:** **₹9,680.00** (Runner 20%).
-* **Trap Filter:** Do NOT buy if it gaps above ₹9,400 at the open!
+* **Current LTP:** ₹${ap} (+2.17% Tuesday surge in falling market).
+* **Buy Zone:** ₹8,790.00 – ₹8,840.00.
+* **1st Stop-Loss:** **₹8,710.00** (-1.24% / -₹110).
+* **Target 1:** **₹8,960.00** (Sell 50% shares).
+* **Target 2:** **₹9,080.00** (Sell 30% shares).
+* **Target 3:** **₹9,220.00** (Runner 20%).
+* **Trap Filter:** Do NOT chase if it opens above ₹8,920 at the open!
       `.trim()
     };
   }
 
-  // Intent: Airtel Query
-  if (query.includes('airtel')) {
-    const ap = airtelQuote ? airtelQuote.price.toFixed(2) : '1854.00';
+  // Intent: Divis Lab Query
+  if (query.includes('divis') || query.includes('divi')) {
+    const dp = divisQuote ? divisQuote.price.toFixed(2) : '9575.00';
     return {
-      title: '📶 Bharti Airtel (Holding Status & Next Levels)',
+      title: "🧪 Divi's Laboratories (Active 20% Runner)",
       badge: 'green',
-      verdict: '🟢 IN ACTIVE PROFIT (+0.76% OUTPERFORMER)',
+      verdict: '🟢 TARGET 1 & 2 HIT (+₹1,470 IN CASH)',
       text: `
-* **Current LTP:** ₹${ap} (Gained from ₹1,840 to ₹1,854).
-* **Monday Performance:** Handily beat Nifty 50 (-0.50% vs Airtel +0.76%).
-* **Action for Tuesday:** **HOLD POSITION**.
-* **Updated Stop-Loss:** Move SL up to **₹1,835.00**.
-* **Target 1:** **₹1,875.00** (Sell 50% shares).
-* **Target 2:** **₹1,895.00** (Sell 30% shares).
-* **Target 3:** **₹1,920.00** (Runner 20%).
-      `.trim()
-    };
-  }
-
-  // Intent: News Query
-  if (query.includes('news') || query.includes('catalyst')) {
-    const [airtelNews, divisNews] = await Promise.all([
-      fetchLiveNews(airtelStock.searchQuery),
-      fetchLiveNews(divisStock.searchQuery)
-    ]);
-    return {
-      title: '📰 Live Financial News & Catalyst Stream',
-      badge: 'blue',
-      verdict: 'News Sentiment Stable',
-      text: `
-**Bharti Airtel Sentiment: ${airtelNews.sentiment}**
-* Catalysts: Tariff hike ARPU expansion towards ₹240+ and steady 5G monetization.
-
-**Divi's Laboratories Sentiment: ${divisNews.sentiment}**
-* Catalysts: Strong active pharmaceutical ingredient (API) export demand, pharma sector rotation out of IT.
-
-*Assessment:* Fundamental tailwinds remain strongly aligned with technical momentum.
+* **Current LTP:** ₹${dp} (Surged +2.79% to day high ₹9,588).
+* **Action for Wednesday:** 80% quantity was booked at ₹9,450 and ₹9,540.
+* **Trailing Stop-Loss on remaining 20%:** **₹9,480.00** (Guarantees +₹180/sh profit on runner).
+* **Target 3:** **₹9,680.00** (Extended swing high).
       `.trim()
     };
   }
@@ -354,13 +365,11 @@ async function generateChatResponse(userMessage) {
   return {
     title: '⚡ Trade Pulse Assistant Response',
     badge: 'blue',
-    verdict: 'Tuesday Watchlist Active',
+    verdict: 'Wednesday Strategy Ready',
     text: `
-I have reviewed your active positions and tomorrow's setups:
-
-1. **Bharti Airtel:** In profit at ₹${airtelQuote ? airtelQuote.price.toFixed(2) : '1854.00'}. Trailing SL updated to ₹1,835. Target 1 is ₹1,875.
-2. **Divi's Laboratories (New):** Ready for Tuesday breakout at ₹${divisQuote ? divisQuote.price.toFixed(2) : '9315.00'}.
-3. **Balu Forge:** Trailing SL hit at ₹565, locking +₹480 profit.
+1. **Divi's Lab:** Hit both Target 1 and Target 2 on Tuesday for over +₹1,400 profit. Trail remaining 20% shares at ₹9,480.
+2. **Apollo Hospitals (New Wednesday Pick):** Surged +2.17% to ₹8,837.50. High-probability breakout setup.
+3. **Bharti Airtel:** Cut cleanly at ₹1,835 trailing stop (-0.38%), keeping losses minimal.
 
 Tap the quick buttons below or ask any question!
     `.trim()
@@ -372,7 +381,6 @@ const server = http.createServer(async (req, res) => {
   const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
   const pathname = parsedUrl.pathname;
 
-  // API: Interactive Chat Query
   if (pathname === '/api/chat' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => { body += chunk.toString(); });
@@ -390,24 +398,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API: Get live stock opinions & targets
   if (pathname === '/api/opinions') {
     const results = [];
     for (const stock of WATCHLIST) {
       const quote = await fetchQuote(stock.symbol);
       const verdict = computeVerdict(stock, quote);
-      results.push({
-        ...stock,
-        quote,
-        verdict
-      });
+      results.push({ ...stock, quote, verdict });
     }
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ success: true, timestamp: new Date().toISOString(), stocks: results }));
     return;
   }
 
-  // API: Get Trade History & Accuracy Statistics
   if (pathname === '/api/accuracy') {
     const total = TRADE_HISTORY.length;
     const wins = TRADE_HISTORY.filter(t => t.outcome === 'WIN').length;
@@ -421,14 +423,13 @@ const server = http.createServer(async (req, res) => {
         losingTrades: total - wins,
         winRatePct: `${winRate}%`,
         target1HitRate: '75.0%',
-        target2HitRate: '55.0%'
+        target2HitRate: '60.0%'
       },
       trades: TRADE_HISTORY
     }));
     return;
   }
 
-  // Static File Serving
   let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
   const ext = path.extname(filePath);
   const contentTypes = {

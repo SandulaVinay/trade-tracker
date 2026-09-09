@@ -34,29 +34,29 @@ async function fetchLiveTickers() {
     if (data.success && data.stocks) {
       data.stocks.forEach(stock => {
         const p = stock.quote && stock.quote.price ? `₹${stock.quote.price.toFixed(2)}` : 'Connecting...';
-        if (stock.ticker === 'BHARTIARTL') {
-          const el = document.getElementById('airtelLtp');
-          if (el) el.textContent = p;
-          const badge = document.getElementById('airtelBadge');
-          if (badge) {
-            badge.textContent = '🟢 IN PROFIT';
-            badge.className = 't-badge badge-green';
-          }
-        } else if (stock.ticker === 'DIVISLAB') {
+        if (stock.ticker === 'DIVISLAB') {
           const el = document.getElementById('divisLtp');
           if (el) el.textContent = p;
           const badge = document.getElementById('divisBadge');
           if (badge) {
+            badge.textContent = '🏆 T1 & T2 HIT';
+            badge.className = 't-badge badge-green';
+          }
+        } else if (stock.ticker === 'APOLLOHOSP') {
+          const el = document.getElementById('apolloLtp');
+          if (el) el.textContent = p;
+          const badge = document.getElementById('apolloBadge');
+          if (badge) {
             badge.textContent = stock.verdict.status === 'BUY' ? 'BUY ZONE' : stock.verdict.status;
             badge.className = `t-badge badge-${stock.verdict.badge}`;
           }
-        } else if (stock.ticker === 'HAL') {
-          const el = document.getElementById('halLtp');
+        } else if (stock.ticker === 'BHARTIARTL') {
+          const el = document.getElementById('airtelLtp');
           if (el) el.textContent = p;
-          const badge = document.getElementById('halBadge');
+          const badge = document.getElementById('airtelBadge');
           if (badge) {
-            badge.textContent = stock.verdict.status;
-            badge.className = `t-badge badge-${stock.verdict.badge}`;
+            badge.textContent = 'SL CUT (-0.38%)';
+            badge.className = 't-badge badge-red';
           }
         }
       });
