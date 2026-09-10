@@ -5,68 +5,68 @@ const path = require('path');
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
-// Strategy definitions for Wednesday
+// Strategy definitions for Thursday
 const WATCHLIST = [
+  {
+    symbol: 'COALINDIA.NS',
+    ticker: 'COALINDIA',
+    name: 'Coal India Limited',
+    searchQuery: 'Coal India stock',
+    type: 'Nifty 50 High-Yield Breakout (New Thursday Pick)',
+    buyMin: 426,
+    buyMax: 431,
+    targetEntry: 428.5,
+    trapCeiling: 437,
+    breakdownFloor: 421,
+    sl1: 420,
+    sl2: 428.5,
+    sl3: 434,
+    target1: 440,
+    target2: 452,
+    target3: 468,
+    triggerDesc: 'Surged +2.56% on Wednesday in market crash. Breakout above ₹433 with volume.',
+    isHolding: false
+  },
   {
     symbol: 'APOLLOHOSP.NS',
     ticker: 'APOLLOHOSP',
     name: 'Apollo Hospitals Enterprise Ltd',
     searchQuery: 'Apollo Hospitals Enterprise stock',
-    type: 'Nifty 50 High-RS Breakout (New Wednesday Pick)',
+    type: 'Nifty 50 Breakout (T1 Hit - 50% Position Active)',
     buyMin: 8790,
     buyMax: 8840,
     targetEntry: 8820,
-    trapCeiling: 8920,
-    breakdownFloor: 8720,
-    sl1: 8710,
-    sl2: 8820,
+    trapCeiling: 9000,
+    breakdownFloor: 8850,
+    sl1: 8890,
+    sl2: 8890,
     sl3: 8890,
     target1: 8960,
     target2: 9080,
     target3: 9220,
-    triggerDesc: 'Surged +2.17% on Tuesday. Clears ₹8,850 after 09:30 AM with volume.',
-    isHolding: false
+    triggerDesc: 'Target 1 Hit @ ₹8,960 (+₹140/sh). Remaining 50% locked with SL @ ₹8,890 (+₹70/sh).',
+    isHolding: true,
+    shares: 5,
+    buyPrice: 8820.00
   },
   {
     symbol: 'DIVISLAB.NS',
     ticker: 'DIVISLAB',
     name: "Divi's Laboratories Ltd",
     searchQuery: "Divis Laboratories stock",
-    type: 'Nifty 50 Breakout (T1 & T2 Hit - 20% Runner Active)',
+    type: 'Audit Log (Full Trade Closed: +₹1,830 Cash)',
     buyMin: 9280,
     buyMax: 9320,
     targetEntry: 9300,
     trapCeiling: 9650,
-    breakdownFloor: 9450,
+    breakdownFloor: 9400,
     sl1: 9480,
     sl2: 9480,
     sl3: 9480,
     target1: 9450,
     target2: 9540,
     target3: 9680,
-    triggerDesc: 'T1 & T2 Hit on Tuesday! 80% booked (+₹1,470 profit). Trail SL @ ₹9,480 on remaining 20%.',
-    isHolding: true,
-    shares: 2,
-    buyPrice: 9300.00
-  },
-  {
-    symbol: 'BHARTIARTL.NS',
-    ticker: 'BHARTIARTL',
-    name: 'Bharti Airtel Ltd',
-    searchQuery: 'Bharti Airtel stock',
-    type: 'Closed Trade Audit (Scratched @ ₹1,835 SL)',
-    buyMin: 1838,
-    buyMax: 1845,
-    targetEntry: 1842,
-    trapCeiling: 1865,
-    breakdownFloor: 1825,
-    sl1: 1835,
-    sl2: 1846,
-    sl3: 1865,
-    target1: 1875,
-    target2: 1895,
-    target3: 1920,
-    triggerDesc: 'Exited on Tuesday morning at trailed SL ₹1,835 (-₹7/sh scratch loss). Inactive.',
+    triggerDesc: 'All 3 tranches closed in cash profit (+₹1,830.00). Position 100% liquidated.',
     isHolding: false
   }
 ];
@@ -75,20 +75,34 @@ const WATCHLIST = [
 const TRADE_HISTORY = [
   {
     id: 1,
-    ticker: 'DIVISLAB (80% Tranche)',
-    name: "Divi's Laboratories",
+    ticker: 'APOLLOHOSP (50% Tranche)',
+    name: 'Apollo Hospitals Enterprise',
     type: '1-Week Swing',
-    entryDate: '2026-09-08',
-    exitDate: '2026-09-08',
-    buyPrice: 9300.00,
-    exitPrice: 9495.00,
-    currentStatus: 'T1 & T2 Both Hit',
-    maxTargetHit: 'Target 2 (+2.58%)',
+    entryDate: '2026-09-09',
+    exitDate: '2026-09-09',
+    buyPrice: 8820.00,
+    exitPrice: 8960.00,
+    currentStatus: 'Target 1 Hit (50% Booked)',
+    maxTargetHit: 'Target 1 (+1.58%)',
     outcome: 'WIN',
-    gainPct: '+2.10% (+₹1,470)'
+    gainPct: '+1.58% (+₹700)'
   },
   {
     id: 2,
+    ticker: 'DIVISLAB (Full Trade)',
+    name: "Divi's Laboratories",
+    type: '1-Week Swing',
+    entryDate: '2026-09-08',
+    exitDate: '2026-09-09',
+    buyPrice: 9300.00,
+    exitPrice: 9480.00,
+    currentStatus: 'All 3 Tranches Closed',
+    maxTargetHit: 'T1 (+1.61%) & T2 (+2.58%)',
+    outcome: 'WIN',
+    gainPct: '+1.97% (+₹1,830)'
+  },
+  {
+    id: 3,
     ticker: 'BHARTIARTL',
     name: 'Bharti Airtel Ltd',
     type: '1-Week Swing',
@@ -102,7 +116,7 @@ const TRADE_HISTORY = [
     gainPct: '-0.38% (-₹70)'
   },
   {
-    id: 3,
+    id: 4,
     ticker: 'BALUFORGE',
     name: 'Balu Forge Industries',
     type: 'Swing Trade',
@@ -116,7 +130,7 @@ const TRADE_HISTORY = [
     gainPct: '+1.73% (+₹480)'
   },
   {
-    id: 4,
+    id: 5,
     ticker: 'M&M',
     name: 'Mahindra & Mahindra',
     type: 'Short Swing',
@@ -129,7 +143,7 @@ const TRADE_HISTORY = [
     gainPct: '+1.09% (+₹259)'
   },
   {
-    id: 5,
+    id: 6,
     ticker: 'SBIN',
     name: 'State Bank of India',
     type: 'Short Swing',
@@ -186,7 +200,7 @@ async function fetchLiveNews(searchQuery) {
     });
 
     const redFlags = ['fraud', 'sebi notice', 'raid', 'investigation', 'downgrade', 'penalty', 'scam', 'default', 'resigns'];
-    const positiveFlags = ['target raised', 'buy rating', 'order win', 'deal', 'profit jumps', 'surge', 'expansion', 'tariff hike'];
+    const positiveFlags = ['target raised', 'buy rating', 'order win', 'deal', 'profit jumps', 'surge', 'expansion', 'dividend'];
 
     let sentiment = 'NEUTRAL / STABLE';
     let sentimentBadge = 'blue';
@@ -233,8 +247,8 @@ function computeVerdict(stock, quote, news) {
     return {
       status: 'HOLD',
       badge: 'green',
-      verdict: `🟢 20% RUNNER ACTIVE (+₹${totalProfit.toFixed(0)})`,
-      advice: `T1 & T2 hit! Hold runner with trailing SL @ ₹${stock.sl1}. Final Target 3: ₹${stock.target3}.`
+      verdict: `🟢 TARGET 1 HIT (+₹${totalProfit.toFixed(0)})`,
+      advice: `50% booked at ₹8,960. Hold remaining 50% with guaranteed SL @ ₹${stock.sl1}. Target 2: ₹${stock.target2}.`
     };
   }
 
@@ -282,94 +296,91 @@ function computeVerdict(stock, quote, news) {
 async function generateChatResponse(userMessage) {
   const query = (userMessage || '').toLowerCase();
   
-  const [apolloQuote, divisQuote, airtelQuote] = await Promise.all([
+  const [coalQuote, apolloQuote, divisQuote] = await Promise.all([
+    fetchQuote('COALINDIA.NS'),
     fetchQuote('APOLLOHOSP.NS'),
-    fetchQuote('DIVISLAB.NS'),
-    fetchQuote('BHARTIARTL.NS')
+    fetchQuote('DIVISLAB.NS')
   ]);
 
+  const coalStock = WATCHLIST.find(s => s.ticker === 'COALINDIA');
   const apolloStock = WATCHLIST.find(s => s.ticker === 'APOLLOHOSP');
-  const divisStock = WATCHLIST.find(s => s.ticker === 'DIVISLAB');
 
-  // Intent: Tuesday Audit & Wednesday Plan
-  if (query.includes('yesterday') || query.includes('profit') || query.includes('assume') || query.includes('wednesday') || query.includes('tomorrow')) {
-    const ap = apolloQuote ? apolloQuote.price.toFixed(2) : '8837.50';
-    const dp = divisQuote ? divisQuote.price.toFixed(2) : '9575.00';
+  // Intent: Thursday Report & Wednesday Audit
+  if (query.includes('report') || query.includes('thursday') || query.includes('audit') || query.includes('wednesday') || query.includes('tomorrow')) {
+    const cp = coalQuote ? coalQuote.price.toFixed(2) : '431.00';
+    const ap = apolloQuote ? apolloQuote.price.toFixed(2) : '8967.00';
     return {
-      title: '📊 Tuesday Truth-in-Trading Audit & Wednesday Plan',
+      title: '📊 Thursday Trade Report & Session Audit',
       badge: 'green',
-      verdict: '✅ Real Profit Verified (+₹1,400 Net Cash on Tuesday)',
+      verdict: '✅ Target 1 Hit on Apollo | 80% Win Rate',
       text: `
-### 1. Tuesday Audit (Real Profit vs Assumption):
-* **DIVISLAB (Real Profit Hit):**
-  * Recommended Buy: ₹9,280 – ₹9,320. Dipped to **₹9,255** and entered in zone.
-  * **Did it hit SL first?** **NO.** Low was ₹9,253 (stayed ₹83 above SL ₹9,170).
-  * **Did it hit Target 1?** **YES.** Reached **₹9,450.00** at 10:30 AM (Sold 50% shares for **+₹150/sh gain**).
-  * **Did it hit Target 2?** **YES.** Reached **₹9,540.00** at 11:30 AM (Sold 30% shares for **+₹240/sh gain**).
-  * Reached day high **₹9,588.00**! **Total cash booked: +₹1,470.00.**
-* **BHARTIARTL (Stop-Loss Cut):**
-  * We raised trailing SL to ₹1,835.
-  * Tuesday morning market sold off, hitting **₹1,834.40**.
-  * **Did it hit SL or Target first?** It hit our trailed SL of ₹1,835 first.
-  * **Did we make profit?** **NO. We took a disciplined scratch loss of -₹7/sh (-₹70 on 10 shares).**
-  * This prevented the loss from widening to ₹1,829!
-* **Net Realized Cash Tuesday:** **+₹1,470 (Divis) - ₹70 (Airtel) = +₹1,400.00 net profit in hand!**
+### 1. Wednesday Session Audit:
+* **APOLLOHOSP (Target 1 Achieved in 1 Day!):**
+  * Entered @ ₹8,820. Low held @ ₹8,803.50 (SL ₹8,710 safe by ₹93).
+  * Surged to **₹8,974.50**, hitting **Target 1 of ₹8,960.00**!
+  * **Sold 50% shares for +₹140.00/sh profit (+₹700 cash).**
+  * Raised SL to **₹8,890.00** (guaranteeing at least +₹70/sh on remaining 50%).
+* **DIVISLAB (Full Trade Completed):**
+  * Runner triggered trailed SL @ **₹9,480.00**.
+  * Total closed cash profit across all tranches: **+₹1,830.00**!
+* **Nifty Context:** Nifty plummeted **-203.60 points (-0.86%)** down to 23,431.50. Our systematic relative strength picks generated pure green profit!
 
-### 2. Strategy for Wednesday (09-Sep-2026):
-* **DIVISLAB (LTP: ₹${dp}):** Hold 20% runner with Trailing SL locked at **₹9,480.00**. Final Target 3: **₹9,680.00**.
-* **APOLLOHOSP (LTP: ₹${ap} — #1 New Wednesday Pick):**
-  * **Buy Zone:** ₹8,790.00 – ₹8,840.00
-  * **Trigger:** 15-min close above ₹8,850.00 after 09:30 AM.
-  * **Stop-Loss:** **₹8,710.00** (-1.24%).
-  * **Target 1:** **₹8,960.00** (+1.58%) | **Target 2:** **₹9,080.00** (+2.94%) | **Target 3:** **₹9,220.00** (+4.53%).
+### 2. Strategy for Thursday (10-Sep-2026):
+* **APOLLOHOSP (LTP: ₹${ap}):** Hold remaining 50% winner with guaranteed SL @ **₹8,890.00**. Target 2: **₹9,080.00** (+2.94%).
+* **COALINDIA (LTP: ₹${cp} — #1 New Thursday Breakout Pick):**
+  * **Buy Zone:** ₹426.00 – ₹431.00
+  * **Trigger:** 15-min close above ₹433.00 after 09:30 AM.
+  * **1st Stop-Loss:** **₹420.00** (-1.98%).
+  * **Target 1:** **₹440.00** (+2.68%) | **Target 2:** **₹452.00** (+5.48%) | **Target 3:** **₹468.00** (+9.21%).
+      `.trim()
+    };
+  }
+
+  // Intent: Coal India Query
+  if (query.includes('coal') || query.includes('coalindia')) {
+    const cp = coalQuote ? coalQuote.price.toFixed(2) : '431.00';
+    return {
+      title: '⚡ Coal India Ltd (New Thursday Pick)',
+      badge: 'green',
+      verdict: '🟢 HIGH-YIELD PSU BREAKOUT (+2.56%)',
+      text: `
+* **Current LTP:** ₹${cp} (Surged +2.56% on massive volume while market crashed).
+* **Buy Zone:** ₹426.00 – ₹431.00.
+* **1st Stop-Loss:** **₹420.00** (-1.98%).
+* **Target 1 (Book 50%):** **₹440.00** (+2.68%).
+* **Target 2 (Book 30%):** **₹452.00** (+5.48%).
+* **Target 3 (Runner 20%):** **₹468.00** (+9.21%).
+* **Trap Filter:** Do NOT chase if it opens above ₹437.00!
       `.trim()
     };
   }
 
   // Intent: Apollo Hospitals Query
-  if (query.includes('apollo') || query.includes('hospital')) {
-    const ap = apolloQuote ? apolloQuote.price.toFixed(2) : '8837.50';
+  if (query.includes('apollo')) {
+    const ap = apolloQuote ? apolloQuote.price.toFixed(2) : '8967.00';
     return {
-      title: '🏥 Apollo Hospitals Enterprise (New Wednesday Pick)',
+      title: '🏥 Apollo Hospitals (Active Winner Status)',
       badge: 'green',
-      verdict: '🟢 HIGH RELATIVE STRENGTH BREAKOUT',
+      verdict: '🟢 TARGET 1 HIT (+₹140/SH BOOKED)',
       text: `
-* **Current LTP:** ₹${ap} (+2.17% Tuesday surge in falling market).
-* **Buy Zone:** ₹8,790.00 – ₹8,840.00.
-* **1st Stop-Loss:** **₹8,710.00** (-1.24% / -₹110).
-* **Target 1:** **₹8,960.00** (Sell 50% shares).
-* **Target 2:** **₹9,080.00** (Sell 30% shares).
-* **Target 3:** **₹9,220.00** (Runner 20%).
-* **Trap Filter:** Do NOT chase if it opens above ₹8,920 at the open!
+* **Current LTP:** ₹${ap} (+1.47% Wednesday surge).
+* **Action for Thursday:** 50% was booked at ₹8,960.00.
+* **Guaranteed Trailing SL on remaining 50%:** **₹8,890.00** (Guarantees +₹70/sh profit).
+* **Target 2:** **₹9,080.00** (52W All-Time High breakout).
+* **Target 3:** **₹9,220.00** (Runner).
       `.trim()
     };
   }
 
-  // Intent: Divis Lab Query
-  if (query.includes('divis') || query.includes('divi')) {
-    const dp = divisQuote ? divisQuote.price.toFixed(2) : '9575.00';
-    return {
-      title: "🧪 Divi's Laboratories (Active 20% Runner)",
-      badge: 'green',
-      verdict: '🟢 TARGET 1 & 2 HIT (+₹1,470 IN CASH)',
-      text: `
-* **Current LTP:** ₹${dp} (Surged +2.79% to day high ₹9,588).
-* **Action for Wednesday:** 80% quantity was booked at ₹9,450 and ₹9,540.
-* **Trailing Stop-Loss on remaining 20%:** **₹9,480.00** (Guarantees +₹180/sh profit on runner).
-* **Target 3:** **₹9,680.00** (Extended swing high).
-      `.trim()
-    };
-  }
-
-  // Default Overview
+  // Default
   return {
     title: '⚡ Trade Pulse Assistant Response',
     badge: 'blue',
-    verdict: 'Wednesday Strategy Ready',
+    verdict: 'Thursday Strategy Active',
     text: `
-1. **Divi's Lab:** Hit both Target 1 and Target 2 on Tuesday for over +₹1,400 profit. Trail remaining 20% shares at ₹9,480.
-2. **Apollo Hospitals (New Wednesday Pick):** Surged +2.17% to ₹8,837.50. High-probability breakout setup.
-3. **Bharti Airtel:** Cut cleanly at ₹1,835 trailing stop (-0.38%), keeping losses minimal.
+1. **Apollo Hospitals:** Target 1 hit! Half booked in cash. Remaining half trailing at ₹8,890.
+2. **Coal India (New Thursday Pick):** Surged +2.56% in falling market. Prime breakout candidate.
+3. **Divi's Lab:** All tranches closed with +₹1,830 cash profit.
 
 Tap the quick buttons below or ask any question!
     `.trim()
@@ -422,7 +433,7 @@ const server = http.createServer(async (req, res) => {
         winningTrades: wins,
         losingTrades: total - wins,
         winRatePct: `${winRate}%`,
-        target1HitRate: '75.0%',
+        target1HitRate: '80.0%',
         target2HitRate: '60.0%'
       },
       trades: TRADE_HISTORY
