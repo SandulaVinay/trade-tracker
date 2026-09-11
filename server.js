@@ -5,26 +5,48 @@ const path = require('path');
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
-// Strategy definitions for Thursday
+// Strategy definitions for Friday (11-Sep-2026)
 const WATCHLIST = [
   {
     symbol: 'COALINDIA.NS',
     ticker: 'COALINDIA',
     name: 'Coal India Limited',
     searchQuery: 'Coal India stock',
-    type: 'Nifty 50 High-Yield Breakout (New Thursday Pick)',
+    type: 'Active Holding (10 Shares Held by User — Target 1 @ ₹440)',
     buyMin: 426,
     buyMax: 431,
-    targetEntry: 428.5,
+    targetEntry: 431.0,
     trapCeiling: 437,
     breakdownFloor: 421,
-    sl1: 420,
+    sl1: 425,
     sl2: 428.5,
     sl3: 434,
     target1: 440,
     target2: 452,
     target3: 468,
-    triggerDesc: 'Surged +2.56% on Wednesday in market crash. Breakout above ₹433 with volume.',
+    triggerDesc: 'Holding 10 shares. Thursday low ₹430 was safe; high reached ₹436.30. Trailed SL raised to ₹425. Target 1: ₹440.',
+    isHolding: true,
+    shares: 10,
+    buyPrice: 431.00
+  },
+  {
+    symbol: 'POWERGRID.NS',
+    ticker: 'POWERGRID',
+    name: 'Power Grid Corporation of India',
+    searchQuery: 'Power Grid Corporation stock',
+    type: 'Nifty 50 High-RS Breakout (#1 Friday Pick)',
+    buyMin: 268,
+    buyMax: 272,
+    targetEntry: 270.5,
+    trapCeiling: 276,
+    breakdownFloor: 265,
+    sl1: 264,
+    sl2: 270.5,
+    sl3: 273,
+    target1: 279,
+    target2: 288,
+    target3: 298,
+    triggerDesc: 'Surged +2.22% to ₹271.75 on Thursday, closing at absolute day high on heavy institutional buying. Multi-week breakout.',
     isHolding: false
   },
   {
@@ -32,11 +54,11 @@ const WATCHLIST = [
     ticker: 'APOLLOHOSP',
     name: 'Apollo Hospitals Enterprise Ltd',
     searchQuery: 'Apollo Hospitals Enterprise stock',
-    type: 'Nifty 50 Breakout (T1 Hit - 50% Position Active)',
+    type: 'Audit Log (Full Trade Closed: +₹1,050 Cash)',
     buyMin: 8790,
     buyMax: 8840,
     targetEntry: 8820,
-    trapCeiling: 9000,
+    trapCeiling: 9050,
     breakdownFloor: 8850,
     sl1: 8890,
     sl2: 8890,
@@ -44,29 +66,7 @@ const WATCHLIST = [
     target1: 8960,
     target2: 9080,
     target3: 9220,
-    triggerDesc: 'Target 1 Hit @ ₹8,960 (+₹140/sh). Remaining 50% locked with SL @ ₹8,890 (+₹70/sh).',
-    isHolding: true,
-    shares: 5,
-    buyPrice: 8820.00
-  },
-  {
-    symbol: 'DIVISLAB.NS',
-    ticker: 'DIVISLAB',
-    name: "Divi's Laboratories Ltd",
-    searchQuery: "Divis Laboratories stock",
-    type: 'Audit Log (Full Trade Closed: +₹1,830 Cash)',
-    buyMin: 9280,
-    buyMax: 9320,
-    targetEntry: 9300,
-    trapCeiling: 9650,
-    breakdownFloor: 9400,
-    sl1: 9480,
-    sl2: 9480,
-    sl3: 9480,
-    target1: 9450,
-    target2: 9540,
-    target3: 9680,
-    triggerDesc: 'All 3 tranches closed in cash profit (+₹1,830.00). Position 100% liquidated.',
+    triggerDesc: 'T1 booked at ₹8,960 (+₹140/sh). Remaining 50% exited at trailed SL ₹8,890 (+₹70/sh). Total cash gain: +₹1,050.',
     isHolding: false
   }
 ];
@@ -75,17 +75,17 @@ const WATCHLIST = [
 const TRADE_HISTORY = [
   {
     id: 1,
-    ticker: 'APOLLOHOSP (50% Tranche)',
+    ticker: 'APOLLOHOSP (Full Trade)',
     name: 'Apollo Hospitals Enterprise',
     type: '1-Week Swing',
     entryDate: '2026-09-09',
-    exitDate: '2026-09-09',
+    exitDate: '2026-09-10',
     buyPrice: 8820.00,
-    exitPrice: 8960.00,
-    currentStatus: 'Target 1 Hit (50% Booked)',
-    maxTargetHit: 'Target 1 (+1.58%)',
+    exitPrice: 8925.00,
+    currentStatus: '100% Closed (T1 & Trailed SL Hit)',
+    maxTargetHit: 'T1 (+1.58%) & High ₹9,024',
     outcome: 'WIN',
-    gainPct: '+1.58% (+₹700)'
+    gainPct: '+1.19% (+₹1,050)'
   },
   {
     id: 2,
@@ -122,15 +122,29 @@ const TRADE_HISTORY = [
     type: 'Swing Trade',
     entryDate: '2026-08-27',
     exitDate: '2026-09-07',
-    buyPrice: 555.40,
-    exitPrice: 565.00,
-    currentStatus: 'Closed (Protected at Trailing SL)',
-    maxTargetHit: 'Locked +₹480 Gain',
+    buyPrice: 740.00,
+    exitPrice: 760.00,
+    currentStatus: 'Target 1 Hit',
+    maxTargetHit: 'Target 1 (+2.70%)',
     outcome: 'WIN',
-    gainPct: '+1.73% (+₹480)'
+    gainPct: '+2.70% (+₹1,000)'
   },
   {
     id: 5,
+    ticker: 'HAL',
+    name: 'Hindustan Aeronautics Ltd',
+    type: 'Intraday/Swing',
+    entryDate: '2026-08-31',
+    exitDate: '2026-08-31',
+    buyPrice: 4835.00,
+    exitPrice: 4747.90,
+    currentStatus: 'Stop-Loss Hit',
+    maxTargetHit: 'SL Cut (-1.80%)',
+    outcome: 'LOSS',
+    gainPct: '-1.80% (-₹871)'
+  },
+  {
+    id: 6,
     ticker: 'M&M',
     name: 'Mahindra & Mahindra',
     type: 'Short Swing',
@@ -143,7 +157,7 @@ const TRADE_HISTORY = [
     gainPct: '+1.09% (+₹259)'
   },
   {
-    id: 6,
+    id: 7,
     ticker: 'SBIN',
     name: 'State Bank of India',
     type: 'Short Swing',
