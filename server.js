@@ -34,7 +34,7 @@ const WATCHLIST = [
     ticker: 'POWERGRID',
     name: 'Power Grid Corporation of India',
     searchQuery: 'Power Grid Corporation stock',
-    type: 'Nifty 50 High-RS Breakout (#1 Friday Pick)',
+    type: 'Active Holding (Breakout Position — Target 1 @ ₹279)',
     buyMin: 268,
     buyMax: 272,
     targetEntry: 270.5,
@@ -46,8 +46,10 @@ const WATCHLIST = [
     target1: 279,
     target2: 288,
     target3: 298,
-    triggerDesc: 'Surged +2.22% to ₹271.75 on Thursday, closing at absolute day high on heavy institutional buying. Multi-week breakout.',
-    isHolding: false
+    triggerDesc: 'Active holding. Friday high touched ₹274.05. Current LTP ₹269.10. Hard SL @ ₹264.00 is safe by over ₹5. Target 1: ₹279.',
+    isHolding: true,
+    shares: 20,
+    buyPrice: 270.50
   },
   {
     symbol: 'APOLLOHOSP.NS',
