@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Trade Tracker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">Trade Tracker <span class="sub">NSE · rules-based · paper first</span></div>
+  <div id="statusbar" class="statusbar"></div>
+</header>
+<nav class="tabs" id="tabs" aria-label="Sections">
+  <button type="button" data-tab="today" class="active" aria-current="page">Today</button>
+  <button type="button" data-tab="calls">Calls</button>
+  <button type="button" data-tab="watch">Watchlist</button>
+  <button type="button" data-tab="lab">Strategy Lab</button>
+  <button type="button" data-tab="chat">Chat</button>
+  <button type="button" data-tab="data">Data &amp; Sources</button>
+</nav>
+<main>
+  <section id="tab-today" class="tab active" aria-label="Today"></section>
+  <section id="tab-calls" class="tab" aria-label="Calls"></section>
+  <section id="tab-watch" class="tab" aria-label="Watchlist"></section>
+  <section id="tab-lab" class="tab" aria-label="Strategy Lab"></section>
+  <section id="tab-chat" class="tab" aria-label="Chat">
+    <div class="chat">
+      <div id="chatlog" class="chatlog" role="log" aria-live="polite" aria-label="Chat messages"></div>
+      <form id="chatform" class="chatform">
+        <input id="chatin" autocomplete="off" aria-label="Message" placeholder='Try: "analyse TCS", "pdf today", "average", "help"'>
+        <button type="submit" class="btn primary">Send</button>
+      </form>
+    </div>
+  </section>
+  <section id="tab-data" class="tab" aria-label="Data and sources"></section>
+</main>
+<div id="modal" class="modal hidden">
+  <div class="modal-box" id="modalbox" role="dialog" aria-modal="true" aria-label="Details" tabindex="-1">
+    <button type="button" class="x" id="modalx" aria-label="Close" title="Close (Esc)">×</button>
+    <div id="modalbody"></div>
+  </div>
+</div>
+<footer class="foot">Analysis from published rules and NSE data, not investment advice. Not SEBI-registered research. You make the final decision.</footer>
+<script src="app.js"></script>
+</body>
+</html>

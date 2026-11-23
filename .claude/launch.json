@@ -1,0 +1,6 @@
+﻿{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "trade-tracker", "runtimeExecutable": "python", "runtimeArgs": ["-m", "tt.app"], "port": 8000 }
+  ]
+}
