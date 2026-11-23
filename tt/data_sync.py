@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 
 from . import store
-from .config import HISTORY_START
+from .config import HISTORY_DAYS, HISTORY_START
 from .nse import DateMismatch, NotPublished, client
 
 log = logging.getLogger("tt.sync")
@@ -138,6 +138,8 @@ def sync_all(full: bool = False) -> dict:
     if not store.q1("SELECT 1 FROM universe LIMIT 1") or full:
         sync_universe()
     start = date.fromisoformat(HISTORY_START)
+    if HISTORY_DAYS:
+        start = max(start, today - timedelta(days=HISTORY_DAYS))
     stats = sync_range(start, today)
     from . import corp_actions
     stats["corporate_actions"] = corp_actions.sync_all()

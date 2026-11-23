@@ -153,3 +153,18 @@ def test_price_cross_check():
     assert err
     _, err = cross_check_price(None, "AAA", 100.0, "2026-11-23")
     assert err
+
+
+def test_password_gate(monkeypatch):
+    import base64
+    from fastapi.testclient import TestClient
+    from tt import app as appmod, config
+    monkeypatch.setattr(config, "APP_PASSWORD", "s3cret-test")
+    c = TestClient(appmod.app)
+    assert c.get("/api/summary").status_code == 401
+    bad = base64.b64encode(b"x:wrong").decode()
+    assert c.get("/api/summary", headers={"Authorization": f"Basic {bad}"}).status_code == 401
+    good = base64.b64encode(b"anyone:s3cret-test").decode()
+    assert c.get("/api/summary", headers={"Authorization": f"Basic {good}"}).status_code == 200
+    monkeypatch.setattr(config, "APP_PASSWORD", "")
+    assert c.get("/api/summary").status_code == 200

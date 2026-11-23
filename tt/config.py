@@ -6,6 +6,24 @@ from datetime import timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def _load_dotenv(path: Path) -> None:
+    """Minimal .env loader (KEY=value per line). Real environment variables win."""
+    try:
+        for line in path.read_text(encoding="utf8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except OSError:
+        pass
+
+
+_load_dotenv(ROOT / ".env")
+
+# Password for the web app. When set, every page and API call needs HTTP Basic login (any username).
+APP_PASSWORD = os.environ.get("TT_PASSWORD", "")
 DATA_DIR = Path(os.environ.get("TT_DATA_DIR", ROOT / "data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "tracker.db"
@@ -17,6 +35,11 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 # History start. NSE's sec_bhavdata_full (prices + delivery %) is available from Jan 2020.
 HISTORY_START = "2020-01-01"
+# Cloud hosts with small, wiped-on-restart disks keep only recent history (enough for the daily scan,
+# which needs ~560 calendar days). Full backtests need the full history and run locally.
+HISTORY_DAYS = int(os.environ.get("TT_HISTORY_DAYS", "0") or 0)   # 0 = full history from HISTORY_START
+CLOUD = bool(os.environ.get("RENDER") or os.environ.get("TT_CLOUD"))
+SEED_DIR = ROOT / "seed"
 
 # Bhavcopy is normally published ~18:00 IST. Daily scan runs after this time.
 DAILY_SCAN_HOUR_IST = 18

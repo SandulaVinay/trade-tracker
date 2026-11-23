@@ -1,0 +1,22 @@
+# Render Blueprint: one free Python web service.
+# Free-tier limits: the instance sleeps after ~15 min without traffic and its disk is wiped on every restart
+# or deploy, so recent NSE history is re-downloaded on start (a few minutes) and paper-trade records do not
+# survive restarts. For persistence, switch to a paid plan and add a disk mounted at TT_DATA_DIR.
+services:
+  - type: web
+    name: trade-tracker
+    runtime: python
+    plan: free
+    branch: rebuild/quant-trade-tracker
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m tt.app
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: TT_HISTORY_DAYS
+        value: "560"
+      - key: TT_DATA_DIR
+        value: /tmp/tt-data
+      - key: TT_PASSWORD
+        generateValue: true

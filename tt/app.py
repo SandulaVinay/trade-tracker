@@ -18,7 +18,30 @@ from .config import (DAILY_SCAN_HOUR_IST, DAILY_SCAN_MINUTE_IST, DEFAULT_CAPITAL
 from .strategies import BY_KEY, CATALOG
 
 log = logging.getLogger("tt.app")
-app = FastAPI(title="Trade Tracker")
+app = FastAPI(title="Trade Tracker", docs_url=None, redoc_url=None, openapi_url=None)
+
+
+@app.middleware("http")
+async def require_password(request, call_next):
+    """HTTP Basic login on every route when TT_PASSWORD is set (needed before exposing the app publicly)."""
+    import base64
+    import secrets
+    from fastapi.responses import Response
+    from .config import APP_PASSWORD
+    if not APP_PASSWORD or request.url.path == "/healthz":
+        return await call_next(request)
+    auth = request.headers.get("authorization", "")
+    ok = False
+    if auth.lower().startswith("basic "):
+        try:
+            _, _, pw = base64.b64decode(auth[6:]).decode("utf8").partition(":")
+            ok = secrets.compare_digest(pw.encode(), APP_PASSWORD.encode())
+        except Exception:
+            ok = False
+    if not ok:
+        return Response("Login required", status_code=401,
+                        headers={"WWW-Authenticate": 'Basic realm="Trade Tracker", charset="UTF-8"'})
+    return await call_next(request)
 
 # ---------------------------------------------------------------- background jobs
 _job_lock = threading.Lock()
@@ -72,6 +95,9 @@ def backtest_job():
     from .market import compute_indicators, load_panel
     _step("Loading full NSE history panel")
     p = load_panel()
+    if len(p.dates) < 750:
+        raise RuntimeError(f"Only {len(p.dates)} sessions of history here; backtests need 3+ years. "
+                           "Run backtests on the local copy (full history); this server shows those seeded results.")
     compute_indicators(p)
     _step(f"Panel {p.close.shape[0]} sessions x {p.close.shape[1]} stocks; running {len(CATALOG)} strategies")
     res = backtest.run_catalog(p)
@@ -83,6 +109,31 @@ def backtest_job():
         _step("No strategy passed every robustness test; keeping the current active strategy")
     store.kv_set("backtest_winner", w["strategy"] if w else None)
     return {"winner": w["strategy"] if w else None}
+
+
+def bootstrap_job():
+    """First start on an empty server: universe, recent NSE history, corporate actions, then the daily scan."""
+    _step("Fresh server: downloading the Nifty 500 list and recent NSE history (two-date checked)")
+    stats = data_sync.sync_all()
+    _step(f"History sync: {stats}")
+    return daily_pipeline()
+
+
+def import_seed():
+    """Load backtest results produced on the full-history local copy (seed/backtests.json) if none exist."""
+    from .config import SEED_DIR
+    path = SEED_DIR / "backtests.json"
+    if store.q1("SELECT 1 FROM backtests LIMIT 1") or not path.exists():
+        return
+    seed = json.loads(path.read_text(encoding="utf8"))
+    with store.tx() as c:
+        for r in seed["backtests"]:
+            c.execute("INSERT INTO backtests (run_at,strategy,params,metrics,trades) VALUES (?,?,?,?,?)",
+                      (r["run_at"], r["strategy"], r["params"], r["metrics"], r["trades"]))
+    for k in ("active_strategy", "backtest_winner"):
+        if seed.get(k):
+            store.kv_set(k, seed[k])
+    log.info("Imported %d seeded backtests (from %s)", len(seed["backtests"]), seed.get("exported_at"))
 
 
 def scheduler():
@@ -105,6 +156,9 @@ def _start():
     import os
     if os.environ.get("TT_NO_SCHEDULER"):
         return
+    import_seed()
+    if not store.q1("SELECT 1 FROM sync_log WHERE kind='bhav' AND status='ok' LIMIT 1"):
+        _run_job("bootstrap", bootstrap_job)  # fresh server: download recent NSE history first
     if not getattr(app.state, "sched", None):
         app.state.sched = threading.Thread(target=scheduler, daemon=True)
         app.state.sched.start()
@@ -133,6 +187,28 @@ class SettingsIn(BaseModel):
 
 class StrategyIn(BaseModel):
     key: str
+
+
+@app.get("/healthz")
+def healthz():
+    """Unauthenticated liveness check for the host (no data exposed)."""
+    return {"ok": True}
+
+
+@app.get("/api/nse-check")
+def nse_check():
+    """Can this server reach NSE? (Cloud data-centre IPs are often blocked.)"""
+    from .nse import client
+    out = {}
+    d = signals.expected_data_date()
+    for name, fn in (("archive_bhavcopy", lambda: client.bhavcopy(d)), ("api_holidays", client.holidays)):
+        t = time.time()
+        try:
+            fn()
+            out[name] = {"ok": True, "seconds": round(time.time() - t, 2)}
+        except Exception as e:
+            out[name] = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}", "seconds": round(time.time() - t, 2)}
+    return {"date": str(d), **out}
 
 
 @app.get("/api/status")
@@ -340,7 +416,10 @@ app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
 def main():
     import uvicorn
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    import os
+    port = int(os.environ.get("PORT", "8000"))
+    host = os.environ.get("TT_HOST") or ("0.0.0.0" if os.environ.get("PORT") else "127.0.0.1")
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":
