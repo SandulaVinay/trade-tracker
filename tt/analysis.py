@@ -1,12 +1,14 @@
 """On-demand analysis of any NSE stock (used by chat, watchlist and PDF)."""
 from __future__ import annotations
 
+import logging
+import threading
 from datetime import date, timedelta
 
 import pandas as pd
 
-from . import news, signals, store, tradeplan
-from .config import DEFAULT_CAPITAL, REGIME_PARTIAL_SIZE
+from . import news, nse, signals, store, tradeplan
+from .config import DEFAULT_CAPITAL, DEEP_CHECK_BUDGET_S, DEEP_CHECK_TIMEOUT_REASON, REGIME_PARTIAL_SIZE
 from .market import compute_indicators, load_panel, regime_series
 from .strategies import BY_KEY, base_filter
 from .strategies import signals as strat_signals
@@ -18,6 +20,33 @@ def resolve_symbol(text: str) -> str | None:
         return t
     r = store.q1("SELECT symbol FROM universe WHERE UPPER(name) LIKE ? ORDER BY LENGTH(name) LIMIT 1", (f"%{t}%",))
     return r["symbol"] if r else None
+
+
+def _manual_surveillance_urls(day: date) -> dict:
+    """Official NSE pages to check manually when an automated check did not finish."""
+    return {"asm": f"{nse.SITE}/api/reportASM", "gsm": f"{nse.SITE}/api/reportGSM",
+            "ban": f"{nse.ARCHIVE}/archives/fo/sec_ban/fo_secban_{day:%d%m%Y}.csv"}
+
+
+def _bounded_company_check(symbol: str, company: str, day: date) -> dict:
+    """Run deep checks under one deadline; an unfinished check always blocks the stock."""
+    out: dict = {}
+    check = news.company_check
+
+    def work():
+        try:
+            out["chk"] = check(symbol, company, day)
+        except Exception as e:
+            logging.getLogger("tt.analysis").warning("company check %s: %s", symbol, e)
+
+    t = threading.Thread(target=work, daemon=True)
+    t.start()
+    t.join(DEEP_CHECK_BUDGET_S)
+    if "chk" in out:
+        return out["chk"]
+    return {"symbol": symbol, "blocked": True, "block_reasons": [DEEP_CHECK_TIMEOUT_REASON],
+            "warnings": [], "positives": [], "results": {}, "shareholding": {},
+            "facts": [], "surveillance_urls": _manual_surveillance_urls(day), "results_event": None}
 
 
 def analyse(symbol: str, deep: bool = True) -> dict:
@@ -55,7 +84,7 @@ def analyse(symbol: str, deep: bool = True) -> dict:
                    [f"No strategy signal on {d}: this is NOT a buy setup. Levels are shown for reference only.",
                     f"Passes base trend/liquidity filters: {'yes' if passes_base else 'no'}."])
     if deep:
-        chk = news.company_check(symbol, p.names.get(symbol, symbol), date.fromisoformat(d))
+        chk = _bounded_company_check(symbol, p.names.get(symbol, symbol), date.fromisoformat(d))
         plan["company"] = {k: chk[k] for k in ("results", "shareholding", "warnings", "positives", "results_event")}
         plan["company_facts"] = chk["facts"]
         plan["surveillance_urls"] = chk["surveillance_urls"]

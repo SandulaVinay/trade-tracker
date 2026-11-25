@@ -1,14 +1,16 @@
 """Core calculation tests (run: python -m pytest -q)."""
 import os
 import tempfile
+import time
 from datetime import date
 
 os.environ.setdefault("TT_DATA_DIR", tempfile.mkdtemp())
 
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
+import pytest  # noqa: E402
 
-from tt import costs, tradeplan  # noqa: E402
+from tt import analysis, costs, news, tradeplan  # noqa: E402
 from tt.confidence import Fact, tier_of, two_date_check  # noqa: E402
 from tt.llm import verify_numbers  # noqa: E402
 from tt.market import Panel, compute_indicators  # noqa: E402
@@ -168,3 +170,197 @@ def test_password_gate(monkeypatch):
     assert c.get("/api/summary", headers={"Authorization": f"Basic {good}"}).status_code == 200
     monkeypatch.setattr(config, "APP_PASSWORD", "")
     assert c.get("/api/summary").status_code == 200
+
+
+def _stub_analyse_market(monkeypatch):
+    p = _synthetic_panel(n_days=700, n_sym=5, seed=4)
+    compute_indicators(p)
+    day = p.close.index[-1].date().isoformat()
+    monkeypatch.setattr(analysis.signals, "ensure_fresh", lambda: {"latest": day, "fresh": True})
+    monkeypatch.setattr(analysis, "load_panel", lambda **kwargs: p)
+    monkeypatch.setattr(analysis.signals, "active_strategy", lambda: ("S2", None))
+    return p.close.columns[0]
+
+
+def test_slow_deep_check_blocks_within_budget(monkeypatch):
+    sym = _stub_analyse_market(monkeypatch)
+    budget = 1.0
+    monkeypatch.setattr(analysis, "DEEP_CHECK_BUDGET_S", budget)
+
+    def slow(symbol, company, today):
+        time.sleep(budget + 2)
+        return {"block_reasons": [], "warnings": [], "positives": [], "results": {},
+                "shareholding": {}, "facts": [], "surveillance_urls": {}, "results_event": None}
+
+    monkeypatch.setattr(news, "company_check", slow)
+    started = time.perf_counter()
+    a = analysis.analyse(sym, deep=True)
+    assert time.perf_counter() - started < budget + 5
+    assert any("not verified" in r for r in a["plan"]["blocked"])
+    assert a["plan"]["surveillance_urls"]
+
+
+def test_fast_deep_check_keeps_verdict(monkeypatch):
+    sym = _stub_analyse_market(monkeypatch)
+
+    def fast(symbol, company, today):
+        return {"block_reasons": [], "warnings": ["Promoter pledge 6.0%"], "positives": [],
+                "results": {}, "shareholding": {}, "facts": [], "surveillance_urls": {"asm": "test-url"},
+                "results_event": None}
+
+    monkeypatch.setattr(news, "company_check", fast)
+    a = analysis.analyse(sym, deep=True)
+    assert a["plan"]["blocked"] == []
+    assert a["plan"]["company"]["warnings"] == ["Promoter pledge 6.0%"]
+    assert not any("not verified" in r for r in a["plan"]["blocked"])
+
+
+def test_unhandled_error_is_friendly():
+    from fastapi.testclient import TestClient
+    from tt import app as appmod
+
+    def boom():
+        raise RuntimeError("secret-internal-detail")
+
+    appmod.app.add_api_route("/_boom", boom)
+    route = appmod.app.routes.pop()
+    mount_at = next(i for i, r in enumerate(appmod.app.routes) if getattr(r, "name", None) == "web")
+    appmod.app.routes.insert(mount_at, route)
+    try:
+        c = TestClient(appmod.app, raise_server_exceptions=False)
+        resp = c.get("/_boom")
+        assert resp.status_code == 500
+        detail = resp.json()["detail"]
+        assert "ref " in detail and "secret-internal-detail" not in detail
+    finally:
+        appmod.app.routes.remove(route)
+
+
+def test_chat_memory_error_is_friendly(monkeypatch):
+    from fastapi.testclient import TestClient
+    from tt import app as appmod
+
+    def boom(*args, **kwargs):
+        raise MemoryError("secret-internal-detail")
+
+    monkeypatch.setattr(appmod.chat, "handle", boom)
+    c = TestClient(appmod.app)
+    text = c.post("/api/chat", json={"message": "hello"}).json()["text"]
+    assert "ran out of memory" in text and "Traceback" not in text
+
+
+def test_chat_hides_internal_exception_text(monkeypatch):
+    from fastapi.testclient import TestClient
+    from tt import app as appmod
+
+    def boom(*args, **kwargs):
+        raise ValueError("secret-internal-detail")
+
+    monkeypatch.setattr(appmod.chat, "handle", boom)
+    c = TestClient(appmod.app)
+    text = c.post("/api/chat", json={"message": "hello"}).json()["text"]
+    assert "secret-internal-detail" not in text and "ref " in text
+
+
+@pytest.fixture
+def dashboard_seed():
+    from types import SimpleNamespace
+    from tt import store
+
+    calls, prices, logs = [], [], []
+
+    def add_call(symbol, status, signal_date="2020-01-02", **kw):
+        row = {"signal_date": signal_date, "symbol": symbol, "name": symbol, "strategy": "S2",
+               "status": status, "mode": "paper", "plan": "{}", **kw}
+        with store.tx() as c:
+            cur = c.execute("INSERT INTO calls (%s) VALUES (%s)" % (",".join(row), ",".join("?" * len(row))),
+                            tuple(row.values()))
+            cid = cur.lastrowid
+        calls.append(cid)
+        return cid
+
+    def add_event(cid, d, kind):
+        with store.tx() as c:
+            c.execute("INSERT INTO call_events (call_id,date,kind,message) VALUES (?,?,?,?)",
+                      (cid, d, kind, "test"))
+
+    def add_price(sym, d, close):
+        with store.tx() as c:
+            c.execute("INSERT OR REPLACE INTO prices VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                      (sym, d, "EQ", close, close, close, close, close, 1000, 10, 10, 500, 50))
+        prices.append((sym, d))
+
+    def add_log(kind, d, fetched_at):
+        with store.tx() as c:
+            c.execute("INSERT OR REPLACE INTO sync_log VALUES (?,?,?,?,?,?,?,?,?)",
+                      (kind, d, "https://nsearchives.nseindia.com/x.csv", d, d, fetched_at, "ok", 1, ""))
+        logs.append((kind, d))
+
+    yield SimpleNamespace(add_call=add_call, add_event=add_event, add_price=add_price, add_log=add_log)
+
+    with store.tx() as c:
+        if calls:
+            ph = ",".join("?" * len(calls))
+            c.execute(f"DELETE FROM call_events WHERE call_id IN ({ph})", tuple(calls))
+            c.execute(f"DELETE FROM calls WHERE id IN ({ph})", tuple(calls))
+        for sym, d in prices:
+            c.execute("DELETE FROM prices WHERE symbol=? AND date=?", (sym, d))
+        for kind, d in logs:
+            c.execute("DELETE FROM sync_log WHERE kind=? AND date=?", (kind, d))
+
+
+def _api_client():
+    from fastapi.testclient import TestClient
+    from tt import app as appmod
+    return TestClient(appmod.app)
+
+
+def test_dashboard_counts(dashboard_seed):
+    s = dashboard_seed
+    s.add_call("DAW", "closed", entry_date="2020-01-03", entry_price=100, qty=10, qty_open=0,
+               realized=1100, charges=20, exit_reason="Manual exit")
+    s.add_call("DAL", "closed", entry_date="2020-01-03", entry_price=200, qty=10, qty_open=0,
+                         realized=1900, charges=20, exit_reason="Stop-loss (gap down)")
+    s.add_call("DAE", "expired")
+    opened = s.add_call("DAO", "open", entry_date="2020-01-03", entry_price=300, qty=5, qty_open=5, last_price=330)
+    s.add_event(opened, "2020-01-04", "target")
+    s.add_call("DAP", "planned")
+    d = _api_client().get("/api/dashboard", params={"from": "2020-01-01", "to": "2020-01-10"}).json()
+    assert (d["total_calls"], d["triggered"], d["not_triggered"], d["pending"], d["open"], d["closed"]) == (5, 3, 1, 1, 1, 2)
+    assert (d["wins"], d["losses"], d["accuracy"], d["target_hits"], d["stop_hits"], d["other_closes"]) == (1, 1, 0.5, 1, 1, 1)
+    assert d["range"] == {"from": "2020-01-01", "to": "2020-01-10"}
+    assert (d["invested"], d["realized_pnl"], d["unrealized_pnl"], d["net_pnl"]) == (4500, -40, 150, 110)
+    assert d["calls"] and d["calls"][0]["signal_date"] == "2020-01-02"
+
+
+def test_dashboard_date_filter_and_validation(dashboard_seed):
+    s = dashboard_seed
+    inside = s.add_call("DAIN", "planned", signal_date="2020-01-02")
+    outside = s.add_call("DAOUT", "planned", signal_date="2020-01-20")
+    c = _api_client()
+    d = c.get("/api/dashboard", params={"from": "2020-01-01", "to": "2020-01-10"}).json()
+    assert [r["id"] for r in d["calls"]] == [inside] and d["total_calls"] == 1
+    assert outside not in {r["id"] for r in d["calls"]}
+    bad = c.get("/api/dashboard", params={"from": "2020-02-30"})
+    assert bad.status_code == 400 and "YYYY-MM-DD" in bad.json()["detail"]
+    reversed_ = c.get("/api/dashboard", params={"from": "2020-01-10", "to": "2020-01-01"})
+    assert reversed_.status_code == 400 and "after" in reversed_.json()["detail"]
+
+
+def test_price_endpoint(dashboard_seed):
+    s = dashboard_seed
+    s.add_price("DXP", "2020-01-01", 100.0)
+    s.add_price("DXP", "2020-01-02", 101.5)
+    s.add_log("bhav", "2020-01-02", "2020-01-02T19:05:00+05:30")
+    c = _api_client()
+    assert c.get("/api/price/UNKNOWNXYZ").status_code == 404
+    r = c.get("/api/price/DXP")
+    assert r.status_code == 200
+    assert r.json() == {"symbol": "DXP", "close": 101.5, "price_date": "2020-01-02",
+                        "fetched_at": "2020-01-02T19:05:00+05:30"}
+
+
+def test_dashboard_zero_closed_accuracy_is_null(dashboard_seed):
+    dashboard_seed.add_call("DAP0", "planned", signal_date="2020-02-01")
+    d = _api_client().get("/api/dashboard", params={"from": "2020-02-01", "to": "2020-02-02"}).json()
+    assert d["closed"] == 0 and d["accuracy"] is None

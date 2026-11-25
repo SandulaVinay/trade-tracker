@@ -75,6 +75,9 @@ CONFLICT_PENALTY = 0.30
 STALE_PENALTY = 0.20
 NEWS_MAX_AGE_DAYS = 7
 
+DEEP_CHECK_BUDGET_S = float(os.environ.get("TT_DEEP_CHECK_BUDGET_S", "25") or 25)
+DEEP_CHECK_TIMEOUT_REASON = "Company checks did not finish in time (not verified). Check NSE surveillance and filings manually"
+
 # ---------------------------------------------------------------- portfolio / risk
 DEFAULT_CAPITAL = 500_000.0
 RISK_PER_TRADE = 0.0075          # 0.75% of capital at risk to the stop

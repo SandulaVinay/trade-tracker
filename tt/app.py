@@ -7,9 +7,10 @@ import threading
 import time
 import traceback
 from datetime import date, datetime, timedelta
+from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -19,6 +20,25 @@ from .strategies import BY_KEY, CATALOG
 
 log = logging.getLogger("tt.app")
 app = FastAPI(title="Trade Tracker", docs_url=None, redoc_url=None, openapi_url=None)
+
+
+def _friendly_error(exc: Exception, rid: str, chat: bool = False) -> str:
+    if isinstance(exc, MemoryError):
+        return "The server ran out of memory while processing this. Try again, or analyse a smaller set of stocks."
+    if isinstance(exc, TimeoutError):
+        return "The market data source took too long to respond. Please try again in a minute."
+    if chat:
+        return f"I could not complete that request (ref {rid}). Please try again. Details are in the server log."
+    return (f"Something went wrong while processing your request (ref {rid}). Please try again in a minute. "
+            "If it keeps happening, check the server log.")
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception(request: Request, exc: Exception):
+    rid = uuid4().hex[:8]
+    log.exception("Unhandled error (ref %s) on %s %s", rid, request.method, request.url.path)
+    return JSONResponse({"detail": _friendly_error(exc, rid)},
+                        status_code=503 if isinstance(exc, TimeoutError) else 500)
 
 
 @app.middleware("http")
@@ -290,6 +310,25 @@ def summary():
     return tracker.summary()
 
 
+@app.get("/api/dashboard")
+def dashboard(from_: str | None = Query(None, alias="from"), to: str | None = None):
+    try:
+        return tracker.dashboard(from_, to)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from None
+
+
+@app.get("/api/price/{symbol}")
+def price(symbol: str):
+    sym = symbol.strip().upper()
+    row = store.q1("SELECT close, date FROM prices WHERE symbol=? ORDER BY date DESC LIMIT 1", (sym,))
+    if not row:
+        raise HTTPException(404, f"no prices for symbol '{sym}'")
+    log_row = store.q1("SELECT fetched_at FROM sync_log WHERE kind='bhav' AND status='ok' AND date=?", (row["date"],))
+    return {"symbol": sym, "close": row["close"], "price_date": row["date"],
+            "fetched_at": log_row["fetched_at"] if log_row else None}
+
+
 @app.get("/api/watchlist")
 def watchlist():
     rows = store.q("SELECT * FROM watchlist ORDER BY added_at DESC")
@@ -384,8 +423,9 @@ def chat_post(c: ChatIn):
     try:
         return chat.handle(c.message)
     except Exception as e:
-        log.error(traceback.format_exc())
-        return {"text": f"Error: {type(e).__name__}: {e}"}
+        rid = uuid4().hex[:8]
+        log.exception("Chat error (ref %s)", rid)
+        return {"text": _friendly_error(e, rid, chat=True)}
 
 
 @app.get("/api/chat")

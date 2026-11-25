@@ -46,6 +46,8 @@ th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line
 th { color: var(--muted); font-weight: 600; font-size: 12px; }
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 .tablewrap { overflow-x: auto; max-width: 100%; }
+tr[data-call] { cursor: pointer; }
+tr[data-call]:hover td { background: var(--chip); }
 .pos { color: var(--good-ink); } .neg { color: var(--bad-ink); }
 .muted { color: var(--muted); } .small { font-size: 12px; }
 ul.tight, ol.tight { margin: 4px 0; padding-left: 18px; } ul.tight li, ol.tight li { margin: 2px 0; }
@@ -77,6 +79,7 @@ ul.tight, ol.tight { margin: 4px 0; padding-left: 18px; } ul.tight li, ol.tight 
 .modal-box .x:hover { color: var(--ink); background: var(--chip); }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .inp { padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); color: var(--ink); font: inherit; width: 120px; max-width: 100%; }
+.inp[type="date"] { width: 145px; }
 select.inp { width: auto; }
 .notice { border-left: 3px solid var(--warn); padding: 8px 12px; background: var(--chip); border-radius: 6px; margin: 8px 0; overflow-wrap: anywhere; }
 .notice.bad { border-color: var(--bad); } .notice.good { border-color: var(--good); }

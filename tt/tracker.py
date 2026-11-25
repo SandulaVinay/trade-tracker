@@ -293,6 +293,82 @@ def summary() -> dict:
     return out
 
 
+def _range_date(value: str | None, label: str) -> str | None:
+    if value is None or value == "":
+        return None
+    try:
+        d = date.fromisoformat(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"invalid {label} date '{value}'; use YYYY-MM-DD") from None
+    if d.isoformat() != value:
+        raise ValueError(f"invalid {label} date '{value}'; use YYYY-MM-DD")
+    return value
+
+
+def _call_pnl(c: dict) -> float:
+    return ((c["realized"] or 0) - (c["entry_price"] or 0) * (c["qty"] or 0)
+            - (c["charges"] or 0))
+
+
+def _stop_hit(c: dict) -> bool:
+    reason = (c["exit_reason"] or "").lower()
+    return "stop-loss" in reason or "trailing stop" in reason
+
+
+def dashboard(date_from: str | None = None, date_to: str | None = None) -> dict:
+    dfrom, dto = _range_date(date_from, "'from'"), _range_date(date_to, "'to'")
+    if dfrom and dto and dfrom > dto:
+        raise ValueError("'from' date must not be after 'to' date")
+    where, args = [], []
+    if dfrom:
+        where.append("signal_date >= ?")
+        args.append(dfrom)
+    if dto:
+        where.append("signal_date <= ?")
+        args.append(dto)
+    sql = "SELECT * FROM calls" + (" WHERE " + " AND ".join(where) if where else "")
+    rows = store.q(sql + " ORDER BY signal_date DESC, id DESC", tuple(args))
+    target_ids = {r["call_id"] for r in store.q("SELECT DISTINCT call_id FROM call_events WHERE kind='target'")}
+
+    triggered = [c for c in rows if c["entry_date"] is not None]
+    not_triggered = [c for c in rows if c["status"] in ("expired", "cancelled")]
+    pending = [c for c in rows if c["status"] == "planned"]
+    open_calls = [c for c in rows if c["status"] == "open"]
+    closed = [c for c in rows if c["status"] == "closed"]
+    wins = [c for c in closed if _call_pnl(c) > 0]
+    stop_hits = [c for c in closed if _stop_hit(c)]
+
+    calls = []
+    for c in rows:
+        r = {"pnl": None, "ret": None}
+        r.update({k: c[k] for k in ("id", "symbol", "status", "signal_date", "entry_date", "entry_price",
+                                    "qty", "exit_reason", "last_price")})
+        if c["status"] == "closed":
+            pnl = _call_pnl(c)
+            cost = (c["entry_price"] or 0) * (c["qty"] or 0)
+            r["pnl"] = round(pnl, 2)
+            r["ret"] = pnl / cost if cost else None
+        elif c["status"] == "open" and c["entry_price"] and c["last_price"]:
+            r["ret"] = c["last_price"] / c["entry_price"] - 1
+        calls.append(r)
+
+    invested = sum((c["entry_price"] or 0) * (c["qty"] or 0) for c in triggered)
+    realized = sum(_call_pnl(c) for c in closed)
+    priced_open = [c for c in open_calls if all(c[k] is not None for k in ("last_price", "qty_open", "entry_price"))]
+    open_value = sum(c["last_price"] * c["qty_open"] for c in priced_open)
+    unrealized = open_value - sum(c["entry_price"] * c["qty_open"] for c in priced_open)
+    return {
+        "range": {"from": dfrom, "to": dto}, "total_calls": len(rows), "triggered": len(triggered),
+        "not_triggered": len(not_triggered), "pending": len(pending), "open": len(open_calls),
+        "closed": len(closed), "wins": len(wins), "losses": len(closed) - len(wins),
+        "accuracy": len(wins) / len(closed) if closed else None,
+        "target_hits": sum(1 for c in rows if c["id"] in target_ids), "stop_hits": len(stop_hits),
+        "other_closes": sum(1 for c in closed if c["id"] not in target_ids and not _stop_hit(c)),
+        "invested": invested, "open_value": open_value, "realized_pnl": realized,
+        "unrealized_pnl": unrealized, "net_pnl": realized + unrealized, "calls": calls,
+    }
+
+
 def to_average() -> list[dict]:
     rows = []
     for c in store.q("SELECT * FROM calls WHERE status='open'"):

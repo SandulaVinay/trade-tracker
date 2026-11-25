@@ -15,7 +15,10 @@ async function api(path, opts = {}) {
   const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
   if (!r.ok) {
     let t = await r.text();
+    const raw = t.trim();
+    const bare = !raw || ["Internal Server Error", "Bad Gateway", "Gateway Timeout", "Service Unavailable"].includes(raw);
     try { const d = JSON.parse(t).detail; t = typeof d === "string" ? d : d ? JSON.stringify(d) : t; } catch (e) {}
+    if (bare) t = `The server could not complete this request (HTTP ${r.status}). Please try again in a minute.`;
     throw new Error(t || `${r.status} ${r.statusText}`);
   }
   return r.json();
@@ -25,7 +28,7 @@ const post = (p, body) => api(p, { method: "POST", body: JSON.stringify(body || 
 // ------------------------------------------------------------------ tabs
 const loaders = {};
 const tabButtons = () => document.querySelectorAll("#tabs button");
-function currentTab() { const b = $("#tabs button.active"); return b ? b.dataset.tab : "today"; }
+function currentTab() { const b = $("#tabs button.active"); return b ? b.dataset.tab : "dashboard"; }
 
 async function runLoader(name) {
   const fn = loaders[name];
@@ -236,6 +239,92 @@ function planView(plan, scan, opts = {}) {
     ${factsTable(marketFacts.concat(companyFacts))}</details>`;
 }
 
+let dashboardRange = { from: "", to: "" };
+function istToday() {
+  return lastStatus && lastStatus.now_ist ? String(lastStatus.now_ist).slice(0, 10) : new Date().toISOString().slice(0, 10);
+}
+function shiftIso(iso, days) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d - days)).toISOString().slice(0, 10);
+}
+const kpiCard = (label, value, extra = "") => `<div class="kpi"><div class="l">${label}</div><div class="v ${extra}">${value}</div></div>`;
+
+function dashboardTable(rows) {
+  if (!rows.length) return `<div class="muted small">No calls in this date range.</div>`;
+  return `<div class="tablewrap"><table><tr><th>#</th><th>Stock</th><th>Status</th><th>Signal</th><th class="n">Entry</th>
+    <th class="n">Qty</th><th class="n">P&amp;L</th><th class="n">Return</th><th class="n">Last</th><th>Reason</th></tr>
+    ${rows.map((r) => `<tr data-call="${esc(r.id)}" tabindex="0"><td>#${esc(r.id)}</td><td>${esc(r.symbol)}</td>
+      <td><span class="pill ${r.status === "open" ? "good" : r.status === "planned" ? "warn" : ""}">${esc(r.status)}</span></td>
+      <td>${esc(r.signal_date)}</td><td class="n">${rs(r.entry_price)}</td><td class="n">${esc(r.qty ?? 0)}</td>
+      <td class="n ${cls(r.pnl)}">${r.pnl == null ? "-" : rs(r.pnl)}</td><td class="n ${cls(r.ret)}">${pct(r.ret)}</td>
+      <td class="n">${rs(r.last_price)}</td><td class="small">${esc(r.exit_reason || "")}</td></tr>`).join("")}</table></div>`;
+}
+
+loaders.dashboard = async function () {
+  const el = $("#tab-dashboard");
+  const q = new URLSearchParams();
+  if (dashboardRange.from) q.set("from", dashboardRange.from);
+  if (dashboardRange.to) q.set("to", dashboardRange.to);
+  const d = obj(await api("/api/dashboard" + (q.toString() ? "?" + q : "")));
+  const range = obj(d.range), rows = arr(d.calls);
+  const accuracy = d.accuracy == null ? "n/a" : pct(d.accuracy, 0);
+  el.innerHTML = `
+  <div class="card"><div class="plan-head"><h2>Dashboard</h2>
+    <form class="row" id="dashForm">
+      <label class="small">From <input class="inp" type="date" id="dFrom" value="${esc(dashboardRange.from)}" aria-label="From signal date"></label>
+      <label class="small">To <input class="inp" type="date" id="dTo" value="${esc(dashboardRange.to)}" aria-label="To signal date"></label>
+      <button type="submit" class="btn primary">Apply</button>
+      <button type="button" class="btn" data-range="today">Today</button>
+      <button type="button" class="btn" data-range="7">7 days</button>
+      <button type="button" class="btn" data-range="30">30 days</button>
+      <button type="button" class="btn" data-range="all">All</button>
+    </form></div>
+    <div class="small muted">Filters by the day the pick was made (signal date). Showing ${esc(range.from || "all")} to ${esc(range.to || "all")}. Default is All.</div></div>
+  <div class="card"><h2>At a glance</h2><div class="kpis">
+    ${kpiCard("Total calls", esc(d.total_calls ?? 0))}
+    ${kpiCard("Triggered", esc(d.triggered ?? 0))}
+    ${kpiCard("Not triggered (expired/cancelled)", esc(d.not_triggered ?? 0))}
+    ${kpiCard("Pending", esc(d.pending ?? 0))}
+    ${kpiCard("Open", esc(d.open ?? 0))}
+    ${kpiCard("Closed", esc(d.closed ?? 0))}</div></div>
+  <div class="grid">
+    <div class="card"><h2>Accuracy</h2><div class="kpis">
+      ${kpiCard("Closed calls", esc(d.closed ?? 0))}
+      ${kpiCard("Wins", esc(d.wins ?? 0))}
+      ${kpiCard("Losses", esc(d.losses ?? 0))}
+      ${kpiCard("Accuracy % (wins / closed)", accuracy)}
+      ${kpiCard("Target hits", esc(d.target_hits ?? 0))}
+      ${kpiCard("Stop hits", esc(d.stop_hits ?? 0))}
+      ${kpiCard("Other closes", esc(d.other_closes ?? 0))}</div>
+      <div class="small muted">A target hit and a stop hit can both apply to the same closed trade; “Other closes” excludes either.</div></div>
+    <div class="card"><h2>Money</h2><div class="kpis">
+      ${kpiCard("Invested", rs(d.invested))}
+      ${kpiCard("Realised P&amp;L", rs(d.realized_pnl), cls(d.realized_pnl))}
+      ${kpiCard("Unrealised P&amp;L", rs(d.unrealized_pnl), cls(d.unrealized_pnl))}
+      ${kpiCard("Net P&amp;L after charges", rs(d.net_pnl), cls(d.net_pnl))}</div>
+      <div class="small muted">Open position value (last price × open qty): ${rs(d.open_value)}. Unrealised P&amp;L subtracts the cost of the open quantity.</div></div>
+  </div>
+  <div class="card"><h2>Calls in range <span class="small muted">${rows.length}</span></h2>
+    ${dashboardTable(rows)}
+    <div class="small muted">Newest signal first. Click a row for the full call timeline.</div></div>`;
+  $("#dashForm").onsubmit = async (e) => {
+    e.preventDefault();
+    dashboardRange = { from: $("#dFrom").value, to: $("#dTo").value };
+    runLoader("dashboard");
+  };
+  el.querySelectorAll("[data-range]").forEach((b) => (b.onclick = () => {
+    const today = istToday();
+    dashboardRange = { today: { from: today, to: today }, 7: { from: shiftIso(today, 6), to: today },
+      30: { from: shiftIso(today, 29), to: today }, all: { from: "", to: "" } }[b.dataset.range];
+    runLoader("dashboard");
+  }));
+  el.querySelectorAll("tr[data-call]").forEach((tr) => {
+    const open = () => openCall(tr.dataset.call);
+    tr.onclick = open;
+    tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+  });
+};
+
 // ------------------------------------------------------------------ TODAY
 loaders.today = async function () {
   const el = $("#tab-today");
@@ -284,13 +373,60 @@ function bindAnalyse(el) {
   el.querySelectorAll("[data-an]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); openAnalysis(a.dataset.an); }));
 }
 
+function fetchedIst(value) {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return String(value).slice(0, 16).replace("T", " ") + " IST";
+  try {
+    return new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: true }).format(d) + " IST";
+  } catch (e) {
+    return String(value).slice(0, 16).replace("T", " ") + " IST";
+  }
+}
+
+function priceText(p, error) {
+  if (error) return `<span class="pill bad">${esc(error)}</span>`;
+  const px = obj(p);
+  const when = px.fetched_at ? `fetched ${esc(fetchedIst(px.fetched_at))}` : "fetch time unknown";
+  return `${rs(px.close)} · NSE close of ${esc(px.price_date || "-")} · ${when}`;
+}
+
+function priceBox(symbol) {
+  return `<div class="small muted" id="priceInfo" data-symbol="${esc(symbol)}">Current price (last NSE end-of-day close, not a live quote):
+    <span id="priceText">Loading…</span> <a href="#" id="priceRefresh">Refresh</a></div>`;
+}
+
+function bindPrice(symbol) {
+  const a = $("#priceRefresh");
+  if (a) a.onclick = async (e) => {
+    e.preventDefault();
+    const box = $("#priceInfo"), txt = $("#priceText");
+    if (!txt) return;
+    txt.textContent = "Refreshing…";
+    try { const p = obj(await api("/api/price/" + encodeURIComponent(symbol)));
+      if ($("#priceInfo") === box) $("#priceText", box).innerHTML = priceText(p); }
+    catch (er) { if ($("#priceInfo") === box) $("#priceText", box).innerHTML = priceText(null, er.message); }
+  };
+}
+
+async function loadPrice(symbol) {
+  const box = $("#priceInfo");
+  if (!box || box.dataset.symbol !== symbol) return;
+  try { const p = obj(await api("/api/price/" + encodeURIComponent(symbol)));
+    if ($("#priceInfo") === box) $("#priceText", box).innerHTML = priceText(p); }
+  catch (e) { if ($("#priceInfo") === box) $("#priceText", box).innerHTML = priceText(null, e.message); }
+}
+
 async function openAnalysis(sym) {
   showModal(`<div class="muted">Analysing ${esc(sym)} from NSE data and filings…</div>`);
   try {
     const a = obj(await api("/api/analyse/" + encodeURIComponent(sym)));
     if (a.error) return showModal(`<div class="notice bad">${esc(a.error)}</div>`);
     showModal(`<div class="small muted">Signals today: ${esc(arr(a.signals_fired).join(", ") || "none")} · regime ${esc(obj(a.regime).state || "-")}</div>` +
+      priceBox(sym) +
       planView(a.plan, { market_facts: [] }, { actions: `<button type="button" class="btn" id="mWatch">+ Watchlist</button><button type="button" class="btn primary" id="mPdf">PDF</button>` }));
+    bindPrice(sym);
+    loadPrice(sym);
     const mPdf = $("#mPdf"), mWatch = $("#mWatch");
     if (mPdf) mPdf.onclick = () => pdfDownload(mPdf, () => chatPdf("pdf " + sym));
     if (mWatch) mWatch.onclick = async () => {
@@ -384,6 +520,7 @@ async function openCall(id) {
       <div class="kpi"><div class="l">Current stop</div><div class="v">${rs(c.stop)}</div></div>
       <div class="kpi"><div class="l">Last</div><div class="v">${rs(c.last_price)} <span class="small muted">${esc(c.last_date || "")}</span></div></div>
       <div class="kpi"><div class="l">Charges</div><div class="v">${rs(c.charges)}</div></div></div>
+    ${priceBox(c.symbol)}
     ${can.length ? `<form class="row card" id="aForm"><b>Log action</b>
       <select id="aAct" class="inp" aria-label="Action">${can.map((a) => `<option>${a}</option>`).join("")}</select>
       <input id="aPx" class="inp" type="number" step="0.05" min="0" placeholder="price" aria-label="Price in rupees (needed for buy, sell, average)">
@@ -391,6 +528,8 @@ async function openCall(id) {
       <button type="submit" class="btn primary" id="aGo">Save</button><span id="aMsg" class="small" role="status"></span></form>` : ""}
     <h3>Timeline</h3>${events.map((e) => `<div class="ev"><b>${esc(e.date)}</b> <span class="pill">${esc(e.kind)}</span> ${esc(e.message)}</div>`).join("") || `<div class="muted small">No events yet.</div>`}
     <h3>Original plan</h3>${planView(c.plan, null)}`);
+  bindPrice(c.symbol);
+  loadPrice(c.symbol);
   const cPdf = $("#cPdf");
   cPdf.onclick = () => pdfDownload(cPdf, async () => obj(await post(`/api/pdf/call/${encodeURIComponent(id)}`)).pdf);
   const form = $("#aForm");
@@ -573,7 +712,7 @@ loaders.data = async function () {
 (async function () {
   initStatusbar();
   await loadStatus();
-  let t = "today";
+  let t = "dashboard";
   try { t = localStorage.getItem("tab") || "today"; } catch (e) {}
   const b = $(`#tabs button[data-tab="${CSS.escape(t)}"]`) || $("#tabs button");
   b.click();
