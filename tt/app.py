@@ -256,7 +256,10 @@ def run(name: str):
 
 @app.get("/api/today")
 def today():
-    return signals.latest_scan() or {}
+    sc = signals.latest_scan() or {}
+    if sc:
+        sc["last_scan"] = store.q1("SELECT run_at,status,data_date FROM scans ORDER BY id DESC LIMIT 1")
+    return sc
 
 
 @app.get("/api/scans")
@@ -379,17 +382,29 @@ def search(q: str):
 def backtests():
     rows = store.q("""SELECT b.* FROM backtests b JOIN (SELECT strategy, MAX(id) id FROM backtests GROUP BY strategy) m
                       ON b.id = m.id ORDER BY b.strategy""")
+    active = signals.active_strategy()[0]
     out = []
+    active_trades: list = []
     for r in rows:
         params = json.loads(r["params"])
         eq = params.pop("equity", [])
         step = max(1, len(eq) // 250)
         s = BY_KEY.get(r["strategy"])
+        trades = store.loads(r["trades"])
         out.append({"strategy": r["strategy"], "name": s.name if s else r["strategy"], "description": s.description if s else "",
                     "rules": s.rules if s else [], "run_at": r["run_at"], "params": params,
                     "metrics": json.loads(r["metrics"]), "equity": eq[::step],
-                    "trades_sample": json.loads(r["trades"])[-40:]})
-    return {"results": out, "active": signals.active_strategy()[0], "winner": store.kv_get("backtest_winner")}
+                    "trades": trades if r["strategy"] == active else [], "trades_sample": trades[-40:]})
+        if r["strategy"] == active:
+            active_trades = trades
+    return {"results": out, "active": active, "winner": store.kv_get("backtest_winner"), "trades": active_trades}
+
+
+@app.get("/api/backtests/trades")
+def backtest_trades():
+    key = signals.active_strategy()[0]
+    r = store.q1("SELECT trades FROM backtests WHERE strategy=? ORDER BY id DESC LIMIT 1", (key,))
+    return {"strategy": key, "trades": store.loads(r["trades"]) if r else []}
 
 
 @app.post("/api/strategy/active")

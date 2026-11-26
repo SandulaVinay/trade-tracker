@@ -70,7 +70,15 @@ ul.tight, ol.tight { margin: 4px 0; padding-left: 18px; } ul.tight li, ol.tight 
 .msg.user a { color: inherit; }
 .msg.assistant { background: var(--chip); }
 .chatform { display: flex; gap: 8px; margin-top: 10px; }
-.chatform input { flex: 1; min-width: 0; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
+.chatinwrap { position: relative; flex: 1; min-width: 0; }
+.chatform input { width: 100%; min-width: 0; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
+.cmdmenu { position: absolute; left: 0; right: 0; bottom: calc(100% + 4px); z-index: 5; max-height: 260px; overflow-y: auto;
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.18); padding: 4px; }
+.cmdmenu.hidden { display: none; }
+.cmdmenu [role="option"] { padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.cmdmenu [role="option"].active { background: var(--chip); }
+.cmdmenu .cmd { font-family: var(--mono); font-weight: 600; }
+.cmdmenu .help { color: var(--muted); font-size: 12px; margin-left: 8px; }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-start; justify-content: center; padding: 30px 12px; overflow-y: auto; z-index: 10; }
 .modal.hidden { display: none; }
 .modal-box { background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; max-width: 900px; width: 100%; min-width: 0; padding: 40px 18px 18px; position: relative; }

@@ -11,8 +11,27 @@ const arr = (v) => (Array.isArray(v) ? v : []);
 const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
 const dash = (v) => (v == null || v === "" ? "-" : v);
 
+async function fetchWithRetry(path, opts) {
+  // The free Render instance can be asleep or restarting; a single dropped connection is retried once.
+  for (let attempt = 1; ; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 60000);
+    try {
+      return await fetch(path, { headers: { "Content-Type": "application/json" }, signal: ctrl.signal, ...opts });
+    } catch (e) {
+      if (attempt >= 2) {
+        const why = e.name === "AbortError" ? "the server took longer than 60 seconds" : "the connection to the server was lost";
+        throw new Error(`Could not reach the server (${why}). It may be waking up or restarting on the free hosting plan. Wait a minute, then press Retry.`);
+      }
+      await new Promise((res) => setTimeout(res, 1500));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
 async function api(path, opts = {}) {
-  const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const r = await fetchWithRetry(path, opts);
   if (!r.ok) {
     let t = await r.text();
     const raw = t.trim();
@@ -339,6 +358,24 @@ loaders.today = async function () {
       <li>Open <b>Strategy Lab</b> and click <b>Run backtests</b> to choose a strategy from the data.</li>
       <li>When a scan finds a pick, a paper call appears in <b>Calls</b> and is tracked every trading day.</li></ol>`}
     <div class="small muted">Job log</div><div class="joblog" data-live>${esc(jobText(window.__job || {}))}</div></div>`;
+  const setups = arr(sc.setups), lastScan = obj(sc.last_scan);
+  const noScan = !hasScan || sc.status === "stale";
+  let setupsHtml = `<div class="card"><h2>Setups to watch</h2>`;
+  if (noScan) {
+    setupsHtml += `<div class="notice bad">${hasScan ? "The latest scan is stale; showing the last verified data for reference only." : "No scan has run yet."}
+      Last scan: ${esc(lastScan.run_at ? fetchedIst(lastScan.run_at) : "none")}${lastScan.data_date ? " · NSE close " + esc(lastScan.data_date) : ""}.
+      Click <b>Sync + scan now</b> at the top of the page to refresh.</div>`;
+  } else if (setups.length) {
+    setupsHtml += `<div class="small muted">Pass the base trend and liquidity filters, but <b>not a pick: no signal today</b>. Ordered by how close they are to the S3 pullback trigger (lowest RSI(2) first, then nearest the 20-day average).</div>
+      <div class="tablewrap"><table><tr><th>Stock</th><th class="n">Close</th><th class="n">Buy zone</th><th class="n">RSI(2)</th><th class="n">From 20-DMA (ATR)</th><th>Status</th></tr>
+      ${setups.map((s) => `<tr><td><a href="#" data-an="${esc(s.symbol)}">${esc(s.symbol)}</a> <span class="small muted">${esc(s.name || "")}</span></td>
+        <td class="n">${rs(s.close)}</td><td class="n">${arr(s.buy_zone).length === 2 ? `${rs(s.buy_zone[0])} – ${rs(s.buy_zone[1])}` : "-"}</td>
+        <td class="n">${isNum(s.rsi2) ? esc(s.rsi2) : "-"}</td><td class="n">${isNum(s.from_20dma_atr) ? esc(s.from_20dma_atr) : "-"}</td>
+        <td class="small">not a pick: no signal today</td></tr>`).join("")}</table></div>`;
+  } else {
+    setupsHtml += `<div class="muted small">No stock passes the base filters without a signal today.</div>`;
+  }
+  html += setupsHtml + `</div>`;
   if (r) {
     html += `<div class="card"><h2>Market regime <span class="pill ${r.state === "ON" ? "good" : r.state === "OFF" ? "bad" : "warn"}">${esc(r.state || "-")}</span></h2>
       <div class="kpis">
@@ -397,8 +434,9 @@ function priceBox(symbol) {
 }
 
 function bindPrice(symbol) {
-  const a = $("#priceRefresh");
-  if (a) a.onclick = async (e) => {
+  const a = $("#priceRefresh"), txt = $("#priceText");
+  if (!a || !txt) return;
+  a.onclick = async (e) => {
     e.preventDefault();
     const box = $("#priceInfo"), txt = $("#priceText");
     if (!txt) return;
@@ -492,6 +530,15 @@ loaders.calls = async function () {
   <div class="card"><h2>Open &amp; planned</h2>${callsTable(open, true, "No open or planned calls. A paper call is created automatically when the daily scan finds a pick.")}</div>
   <div class="card"><h2>Old calls</h2>${callsTable(past, false, "No closed, expired or cancelled calls yet.")}</div>`;
   el.querySelectorAll("[data-call]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); openCall(a.dataset.call); }));
+  el.querySelectorAll("[data-price]").forEach(async (cell) => {
+    const sym = cell.dataset.price;
+    try {
+      const p = obj(await api("/api/price/" + encodeURIComponent(sym)));
+      if (document.contains(cell)) cell.innerHTML = `${rs(p.close)}<div class="small muted">NSE close ${esc(p.price_date || "-")} · fetched ${esc(p.fetched_at ? fetchedIst(p.fetched_at) : "time unknown")}</div>`;
+    } catch (e) {
+      if (document.contains(cell)) cell.innerHTML = `${rs(cell.dataset.last)}<div class="small muted">${esc(cell.dataset.lastdate || "date unknown")} · fetch time unavailable</div>`;
+    }
+  });
 };
 
 function callsTable(rows, live, emptyText) {
@@ -502,7 +549,8 @@ function callsTable(rows, live, emptyText) {
       <td><span class="pill ${r.status === "open" ? "good" : r.status === "planned" ? "warn" : ""}">${esc(r.status)}</span></td>
       <td>${esc(r.signal_date)}</td><td class="n">${rs(r.entry_price)}</td><td class="n">${rs(r.stop)}</td>
       <td class="n">${rs(ps.target1)} / ${rs(ps.target2)}</td>
-      <td class="n">${rs(live ? r.last_price : r.exit_price)}</td><td class="n ${cls(r.ret)}">${pct(r.ret)}</td>
+      <td class="n" ${live ? `data-price="${esc(r.symbol)}" data-last="${esc(r.last_price ?? "")}" data-lastdate="${esc(r.last_date || "")}"` : ""}>${rs(live ? r.last_price : r.exit_price)}${live ? `<div class="small muted">${esc(r.last_date || "date unknown")} · fetch time loading…</div>` : ""}</td>
+      <td class="n ${cls(r.ret)}">${pct(r.ret)}</td>
       <td class="small">${esc(live ? r.mode : r.exit_reason || "")}</td></tr>`; }).join("")}</table></div>`;
 }
 
@@ -531,7 +579,7 @@ async function openCall(id) {
   bindPrice(c.symbol);
   loadPrice(c.symbol);
   const cPdf = $("#cPdf");
-  cPdf.onclick = () => pdfDownload(cPdf, async () => obj(await post(`/api/pdf/call/${encodeURIComponent(id)}`)).pdf);
+  if (cPdf) cPdf.onclick = () => pdfDownload(cPdf, async () => obj(await post(`/api/pdf/call/${encodeURIComponent(id)}`)).pdf);
   const form = $("#aForm");
   if (form) form.onsubmit = async (e) => {
     e.preventDefault();
@@ -618,6 +666,42 @@ loaders.lab = async function () {
       ${isNum(f.max_drawdown) && isNum(f.bench_max_drawdown) ? (f.max_drawdown > f.bench_max_drawdown ? " Its worst drawdown was shallower than the index's." : " Its worst drawdown was also deeper than the index's.") : ""}
       ${beat ? "" : " This matches the research plan: keep most money in an index core and treat this as a small, rule-based satellite."}</div>`;
   }
+  const trades = arr(b.trades);
+  const tradeRows = (list) => list.slice().sort((x, y) => String(y.exit_date || y.entry_date || "").localeCompare(String(x.exit_date || x.entry_date || "")))
+    .map((t) => `<tr><td>${esc(t.symbol)}</td><td>${esc(t.entry_date)}</td><td>${esc(t.exit_date)}</td>
+      <td class="n">${rs(t.entry)}</td><td class="n">${rs(t.avg_exit)}</td><td class="n ${cls(t.ret)}">${pct(t.ret, 2)}</td>
+      <td class="n">${esc(dash(t.hold_days))}</td><td class="small">${esc(t.reason || "-")}</td></tr>`).join("")
+    || `<tr><td colspan="8" class="muted">No trades match this filter.</td></tr>`;
+  const stockRows = (list) => {
+    const by = new Map();
+    list.forEach((t) => {
+      const k = String(t.symbol || "").toUpperCase(), g = by.get(k) || { symbol: k, n: 0, wins: 0, ret: 0 };
+      g.n++; g.wins += Number(t.pnl) > 0 ? 1 : 0; g.ret += Number(t.ret) || 0; by.set(k, g);
+    });
+    const groups = [...by.values()].sort((x, y) => y.n - x.n || x.symbol.localeCompare(y.symbol));
+    return groups.map((g) => `<tr><td>${esc(g.symbol)}</td><td class="n">${g.n}</td><td class="n">${g.wins}</td>
+      <td class="n">${pct(g.n ? g.wins / g.n : null, 0)}</td><td class="n ${cls(g.ret)}">${pct(g.ret, 2)}</td></tr>`).join("")
+      || `<tr><td colspan="5" class="muted">No stocks match this filter.</td></tr>`;
+  };
+  const renderTradeTables = (filter) => {
+    const q = String(filter || "").trim().toUpperCase();
+    const shown = trades.filter((t) => String(t.symbol || "").toUpperCase().includes(q));
+    const tb = $("#tradeBody"), sb = $("#stockBody");
+    if (tb) tb.innerHTML = tradeRows(shown);
+    if (sb) sb.innerHTML = stockRows(shown);
+  };
+  const distinctStocks = new Set(trades.map((t) => String(t.symbol || "").toUpperCase())).size;
+  const wins = trades.filter((t) => Number(t.pnl) > 0).length;
+  const avgReturn = trades.length ? trades.reduce((s, t) => s + (Number(t.ret) || 0), 0) / trades.length : null;
+  const tradeSection = `<div class="card"><h2>Trades of ${esc(b.active || "-")}</h2>
+    <div class="small">${trades.length} trades · ${distinctStocks} distinct stocks · win rate ${pct(trades.length ? wins / trades.length : null, 0)} · average return ${pct(avgReturn, 2)}</div>
+    <label class="small">Filter by stock <input class="inp" id="tradeSearch" aria-label="Filter trades by stock symbol" placeholder="e.g. TCS"></label>
+    <div class="tablewrap"><table><tr><th>Stock</th><th>Entry date</th><th>Exit date</th><th class="n">Entry Rs</th>
+      <th class="n">Exit Rs</th><th class="n">Return %</th><th class="n">Hold (sessions)</th><th>Exit reason</th></tr>
+      <tbody id="tradeBody"></tbody></table></div>
+    <h3>Per stock</h3><div class="tablewrap"><table><tr><th>Stock</th><th class="n">Trades</th><th class="n">Wins</th>
+      <th class="n">Win rate</th><th class="n">Total return %</th></tr><tbody id="stockBody"></tbody></table></div>
+    <div class="small muted">Newest exit first. Search matches stock symbols case-insensitively and applies to both tables.</div></div>`;
   let html = `<div class="card"><div class="plan-head"><h2>Strategy discovery (NSE data from Jan 2020, trades from Jan 2021)</h2>
     <button type="button" class="btn primary" id="btnBt" data-job ${running ? "disabled" : ""}>Run backtests</button></div>
     <div class="small muted">Signal at close, buy next open (skipped above the no-chase price), stop 2.5×ATR, book ⅓ at T1 (1.5R) and ⅓ at T2 (3R), trail 3×ATR, time exit day 45.
@@ -627,6 +711,7 @@ loaders.lab = async function () {
     ${b.winner ? `<div class="notice good">Robust winner: <b>${esc(b.winner)}</b>. Active strategy: <b>${esc(b.active)}</b>.</div>` : results.length ? `<div class="notice bad">No strategy passed every robustness test. Active strategy: <b>${esc(b.active)}</b>. Treat picks with extra caution.</div>` : ""}
     ${verdict}
     ${running || job.name === "backtest" ? `<div class="small muted">Job log</div><div class="joblog" data-live>${esc(jobText(job))}</div>` : ""}</div>`;
+  html += tradeSection;
   if (!results.length) html += `<div class="card muted">No backtest yet. Sync NSE data first (Sync + scan now), then click “Run backtests” (takes a few minutes). Until then the default strategy <b>${esc(b.active || "-")}</b> is used.</div>`;
   else {
     const n = results.length + 1;
@@ -647,6 +732,9 @@ loaders.lab = async function () {
       <div class="small muted">Exit reasons: ${Object.entries(obj(full.exit_reasons)).map(([k, v]) => `${esc(k)} ${esc(v)}`).join(" · ") || "-"}</div></div>`; }).join("");
   }
   el.innerHTML = html;
+  renderTradeTables("");
+  const tradeSearch = $("#tradeSearch");
+  if (tradeSearch) tradeSearch.oninput = () => renderTradeTables(tradeSearch.value);
   $("#btnBt").onclick = () => runJob("backtest");
   el.querySelectorAll("[data-act]").forEach((x) => (x.onclick = async () => {
     try { await post("/api/strategy/active", { key: x.dataset.act }); } catch (e) { alert(e.message); }
@@ -671,10 +759,91 @@ loaders.chat = async function () {
   h.forEach((m) => addMsg(m.role, m.text, m.attachment));
   $("#chatlog").dataset.loaded = 1;
 };
+const SLASH_COMMANDS = [
+  ["/today", "Today's pick, or why there is none"],
+  ["/pick", "Same as /today"],
+  ["/holdings", "Open and planned paper calls"],
+  ["/average", "Open positions below entry and averaging verdict"],
+  ["/upcoming", "Stocks close to a 52-week-high breakout"],
+  ["/regime", "Market health: Nifty 500 vs 200-DMA and breadth"],
+  ["/strategy", "Backtest results and the active strategy"],
+  ["/watch SYMBOL", "Add a stock to the watchlist"],
+  ["/unwatch SYMBOL", "Remove a stock from the watchlist"],
+  ["/analyse SYMBOL", "Full rule-based trade-setup verdict"],
+  ["/pdf SYMBOL|today", "Generate a PDF for a stock or today's pick"],
+  ["/bought N at PRICE", "Log a buy on call #N"],
+  ["/sold N at PRICE", "Log a sell on call #N"],
+  ["/averaged N at PRICE", "Log an average on call #N"],
+  ["/help", "Show all commands"],
+];
+let cmdActive = -1;
+function closeCmdMenu() {
+  const menu = $("#cmdmenu"), inp = $("#chatin");
+  if (!menu || !inp) return;
+  menu.classList.add("hidden");
+  menu.innerHTML = "";
+  inp.setAttribute("aria-expanded", "false");
+  inp.removeAttribute("aria-activedescendant");
+  cmdActive = -1;
+}
+function setCmdActive() {
+  const menu = $("#cmdmenu"), inp = $("#chatin");
+  menu.querySelectorAll('[role="option"]').forEach((el, i) => {
+    const on = i === cmdActive;
+    el.classList.toggle("active", on);
+    el.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  if (cmdActive >= 0) inp.setAttribute("aria-activedescendant", "cmdopt-" + cmdActive);
+  else inp.removeAttribute("aria-activedescendant");
+}
+function fillSlashCommand(cmd) {
+  const inp = $("#chatin");
+  inp.value = cmd + " ";
+  inp.focus();
+  cmdActive = 0;
+  renderCmdMenu();
+}
+function renderCmdMenu() {
+  const inp = $("#chatin"), menu = $("#cmdmenu");
+  if (!inp || !menu) return;
+  const v = inp.value;
+  if (!v.startsWith("/")) return closeCmdMenu();
+  const matches = SLASH_COMMANDS.filter((c) => c[0].toLowerCase().startsWith(v.toLowerCase()));
+  if (!matches.length) return closeCmdMenu();
+  cmdActive = cmdActive < 0 ? 0 : Math.min(cmdActive, matches.length - 1);
+  menu.innerHTML = matches.map(([cmd, help], i) => `<div id="cmdopt-${i}" role="option" aria-selected="${i === cmdActive}"
+    class="${i === cmdActive ? "active" : ""}" data-cmd="${esc(cmd)}"><span class="cmd">${esc(cmd)}</span><span class="help">${esc(help)}</span></div>`).join("");
+  menu.classList.remove("hidden");
+  inp.setAttribute("aria-expanded", "true");
+  setCmdActive();
+  menu.querySelectorAll("[data-cmd]").forEach((el) => el.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    fillSlashCommand(el.dataset.cmd);
+  }));
+}
+$("#chatin").addEventListener("input", renderCmdMenu);
+$("#chatin").addEventListener("keydown", (e) => {
+  const menu = $("#cmdmenu");
+  if (!menu || menu.classList.contains("hidden")) return;
+  const opts = menu.querySelectorAll('[role="option"]');
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    if (opts.length) cmdActive = (cmdActive + (e.key === "ArrowDown" ? 1 : -1) + opts.length) % opts.length;
+    setCmdActive();
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    if (opts[cmdActive]) fillSlashCommand(opts[cmdActive].dataset.cmd);
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    closeCmdMenu();
+  }
+});
+document.addEventListener("click", (e) => { if (!e.target.closest(".chatinwrap")) closeCmdMenu(); });
 $("#chatform").onsubmit = async (e) => {
   e.preventDefault();
   const v = $("#chatin").value.trim();
   if (!v) return;
+  closeCmdMenu();
   $("#chatin").value = "";
   addMsg("user", v);
   const wait = document.createElement("div"); wait.className = "msg assistant muted"; wait.textContent = "Working…"; $("#chatlog").appendChild(wait);

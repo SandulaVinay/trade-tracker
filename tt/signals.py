@@ -261,6 +261,28 @@ def run_scan(capital: float | None = None, deep_checks: int = MAX_DEEP_CHECKS, c
                            "vol_ratio": round(float(p.ind["vol_ratio"][s].iloc[-1]), 2) if pd.notna(p.ind["vol_ratio"][s].iloc[-1]) else None,
                            "industry": p.industry[s]} for s in up[:15]]
 
+    signalled = {s for values in all_sigs.values() for _, s in values}
+    setups = []
+    for sym in p.close.columns:
+        if not bf.get(sym, False) or sym in signalled or sym in held:
+            continue
+        sr = _row(p, sym)
+        plan_s = tradeplan.build(sym, p.names[sym], sr, stats, capital, size_mult, key, strat.name)
+        px = plan_s["signal_close"]
+        zone = plan_s["buy_zone"]
+        distance = 0.0 if zone[0] <= px <= zone[1] else (zone[0] - px if px < zone[0] else px - zone[1]) / px * 100
+        rsi2 = p.ind["rsi2"][sym].iloc[-1] if "rsi2" in p.ind else None
+        rsi2 = round(float(rsi2), 1) if rsi2 is not None and pd.notna(rsi2) else None
+        s20, atr = sr.get("sma20"), sr.get("atr")
+        from20 = round(abs(sr["close"] - s20) / atr, 2) if s20 and atr else None
+        setups.append({"symbol": sym, "name": p.names[sym], "close": px, "buy_zone": zone,
+                       "no_chase_above": plan_s["no_chase_above"], "distance_pct": round(float(distance), 2),
+                       "rsi2": rsi2, "from_20dma_atr": from20, "data_date": d})
+    # closest to the pullback trigger first: lowest RSI(2), then nearest to the 20-DMA in ATR units
+    setups.sort(key=lambda x: (x["rsi2"] if x["rsi2"] is not None else 999,
+                               x["from_20dma_atr"] if x["from_20dma_atr"] is not None else 999))
+    result["setups"] = setups[:10]
+
     if size_mult == 0:
         result.update(status="no_trade", message=f"No trade today: market regime is {state} "
                                                  f"(Nifty 500 vs 200-DMA and breadth {rr['breadth']:.0%}).")

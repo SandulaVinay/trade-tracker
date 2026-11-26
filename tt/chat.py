@@ -4,11 +4,11 @@ from __future__ import annotations
 import json
 import re
 
-from . import analysis, llm, pdf, signals, store, tracker
+from . import analysis, llm, pdf, signals, store, tracker, verdict
 
-HELP = """Things you can ask:
+HELP = """Things you can ask (commands work with or without a leading "/", and "/" shows this menu):
 - "today" or "pick" - today's pick (or why there is none)
-- "analyse TCS" / "check Tata Motors" - full analysis of any NSE stock
+- "TCS", "analyse TCS" / "check Tata Motors" - full trade-setup verdict for any NSE stock
 - "pdf TCS" or "pdf today" - generate a PDF report with sources
 - "holdings" / "open calls" - open and planned calls
 - "average" - positions down from entry and whether averaging is allowed
@@ -16,7 +16,8 @@ HELP = """Things you can ask:
 - "regime" - market health
 - "watch TCS" / "unwatch TCS" - manage your watchlist
 - "bought 12 at 1450" / "sold 12 at 1500" / "average 12 at 1400" - log actions on call #12
-- "strategy" - backtest results and the active strategy"""
+- "strategy" - backtest results and the active strategy
+- "help" - this menu; type "/" in the chat box to see all commands"""
 
 
 def _fmt_plan(plan: dict) -> str:
@@ -49,13 +50,43 @@ def handle(msg: str) -> dict:
     return out
 
 
+def _verdict_reply(sym: str, a: dict, narrative: bool = False) -> dict:
+    a = dict(a)
+    a["fetched_at"] = store.now_ist().isoformat()
+    call = store.q1("SELECT * FROM calls WHERE symbol=? AND status='open' ORDER BY id DESC LIMIT 1", (sym,))
+    if call:
+        a["call"] = call
+        a["call_events"] = store.q("SELECT * FROM call_events WHERE call_id=? ORDER BY id", (call["id"],))
+    v = verdict.verdict(a)
+    text = v["text"]
+    if narrative and llm.enabled():
+        ctx = {"verdict": {k: v[k] for k in ("verdict", "horizon", "expected_duration", "reasons", "entry_zone",
+                                             "stop", "targets", "trend", "fundamentals", "news", "data_missing")},
+               "analysis": {k: a.get(k) for k in ("symbol", "data_date", "signals_fired", "passes_base", "regime")}}
+        r = llm.ask("Explain this rule-based verdict in plain language. Do not change the verdict or invent numbers.", ctx)
+        if r.get("ok") and not llm.verify_numbers(r.get("text", ""), json.dumps(ctx, default=str)):
+            extra = "AI narrative (the verdict above is rules-only): " + r["text"]
+        else:
+            extra = f"AI narrative not shown: {r.get('reason', 'number check failed')}"
+        if text.endswith(verdict.DISCLAIMER):
+            text = text[:-len(verdict.DISCLAIMER)].rstrip() + "\n\n" + extra + "\n\n" + verdict.DISCLAIMER
+        else:
+            text += "\n\n" + extra
+    return {"text": text, "analysis": a, "verdict": v}
+
+
 def _route(m: str) -> dict:
+    m = m.strip()
+    if m.startswith("/"):
+        m = m[1:].strip()
+    if not m:
+        return {"text": HELP}
     low = m.lower()
     if low in ("help", "?", "hi", "hello"):
         return {"text": HELP}
-    mm = re.match(r"^(bought|sold|average|avg)\s+#?(\d+)\s+(?:at|@)\s*([\d.]+)(?:\s+(?:qty\s*)?(\d+))?", low)
+    mm = re.match(r"^(bought|sold|averaged|average|avg)\s+#?(\d+)\s+(?:at|@)\s*([\d.]+)(?:\s+(?:qty\s*)?(\d+))?", low)
     if mm:
-        act = {"bought": "buy", "sold": "sell", "avg": "average"}.get(mm.group(1), mm.group(1))
+        act = {"bought": "buy", "sold": "sell", "avg": "average", "averaged": "average"}.get(mm.group(1), mm.group(1))
         try:
             c = tracker.manual(int(mm.group(2)), act, float(mm.group(3)), int(mm.group(4)) if mm.group(4) else None)
             return {"text": f"Logged {act} on call #{c['id']} {c['symbol']}: status {c['status']}, qty open {c['qty_open']}, "
@@ -87,12 +118,7 @@ def _route(m: str) -> dict:
         a = analysis.analyse(sym)
         if a.get("error"):
             return {"text": a["error"]}
-        txt = _fmt_plan(a["plan"])
-        txt += f"\nSignals today: {', '.join(a['signals_fired']) or 'none'} | Regime {a['regime']['state']}"
-        if llm.enabled():
-            r = llm.ask("Summarise this analysis for the user in plain language.", a)
-            txt += "\n\nAI summary: " + (r["text"] if r["ok"] else f"(not shown: {r['reason']})")
-        return {"text": txt, "analysis": a}
+        return _verdict_reply(sym, a, narrative=True)
     if low in ("today", "pick", "today's pick", "todays pick"):
         sc = signals.latest_scan()
         if not sc:
@@ -140,6 +166,12 @@ def _route(m: str) -> dict:
         return {"text": f"Active: {b['name']} ({b['key']}). Win rate {s.get('win_rate', 0):.0%}, expectancy {s.get('expectancy', 0):.2%}/trade, "
                         f"max DD {s.get('max_drawdown', 0):.0%}, CAGR after cost+tax {s.get('cagr_after_cost_tax') or 0:.1%} "
                         f"vs Nifty 500 {s.get('bench_cagr') or 0:.1%}. See the Strategy Lab tab." if s else "No backtest yet."}
+    sym = analysis.resolve_symbol(m)
+    if sym:
+        a = analysis.analyse(sym)
+        if a.get("error"):
+            return {"text": a["error"]}
+        return _verdict_reply(sym, a)
     if llm.enabled():
         sc = signals.latest_scan() or {}
         ctx = {"latest_scan": {k: sc.get(k) for k in ("status", "message", "regime", "pick", "strategy", "upcoming")},
@@ -148,7 +180,7 @@ def _route(m: str) -> dict:
         if r["ok"]:
             return {"text": r["text"]}
         return {"text": f"I could not give a verified answer ({r['reason']}).\n\n{HELP}"}
-    return {"text": "I didn't recognise that. " + HELP}
+    return {"text": "I didn't recognise that. Type '/' for commands, or try a stock symbol. " + HELP}
 
 
 def _strategy_block() -> dict:

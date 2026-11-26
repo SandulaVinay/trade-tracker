@@ -80,6 +80,8 @@ def analyse(symbol: str, deep: bool = True) -> dict:
                            size_mult if fired else 0.0, key, BY_KEY[key].name)
     plan["data_date"] = d
     plan["industry"] = p.industry.get(symbol, "Unknown")
+    rsi2 = p.ind["rsi2"][symbol].iloc[-1]
+    plan["indicators"]["rsi2"] = round(float(rsi2), 2) if pd.notna(rsi2) else None
     plan["why"] = (signals._why(symbol, row, BY_KEY[fired[0]], reg) if fired else
                    [f"No strategy signal on {d}: this is NOT a buy setup. Levels are shown for reference only.",
                     f"Passes base trend/liquidity filters: {'yes' if passes_base else 'no'}."])

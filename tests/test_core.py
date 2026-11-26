@@ -10,7 +10,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
-from tt import analysis, costs, news, tradeplan  # noqa: E402
+from tt import analysis, chat, costs, news, tradeplan, verdict  # noqa: E402
 from tt.confidence import Fact, tier_of, two_date_check  # noqa: E402
 from tt.llm import verify_numbers  # noqa: E402
 from tt.market import Panel, compute_indicators  # noqa: E402
@@ -364,3 +364,127 @@ def test_dashboard_zero_closed_accuracy_is_null(dashboard_seed):
     dashboard_seed.add_call("DAP0", "planned", signal_date="2020-02-01")
     d = _api_client().get("/api/dashboard", params={"from": "2020-02-01", "to": "2020-02-02"}).json()
     assert d["closed"] == 0 and d["accuracy"] is None
+
+
+def test_backtest_trades_endpoint_returns_active_strategy_list():
+    from fastapi.testclient import TestClient
+    from tt import app as appmod, store
+
+    key = "TSTRA"
+    trades = [{"symbol": "TCS", "entry_date": "2026-11-25", "exit_date": "2026-11-26", "entry": 1000.0,
+               "avg_exit": 1020.0, "pnl": 200.0, "ret": 0.02, "r_mult": 1.0, "hold_days": 1,
+               "t1_days": 1, "t2_days": None, "reason": "target"}]
+    old = store.kv_get("active_strategy")
+    with store.tx() as c:
+        c.execute("INSERT INTO backtests (run_at,strategy,params,metrics,trades) VALUES (?,?,?,?,?)",
+                  ("2026-11-26T10:00:00+05:30", key, "{}", "{}", store.dumps(trades)))
+    store.kv_set("active_strategy", key)
+    try:
+        c = TestClient(appmod.app)
+        r = c.get("/api/backtests").json()
+        active = next(row for row in r["results"] if row["strategy"] == key)
+        assert r["active"] == key and active["trades"] == trades and r["trades"] == trades
+        assert c.get("/api/backtests/trades").json() == {"strategy": key, "trades": trades}
+    finally:
+        with store.tx() as c:
+            c.execute("DELETE FROM backtests WHERE strategy=?", (key,))
+            if old is None:
+                c.execute("DELETE FROM kv WHERE key='active_strategy'")
+        if old is not None:
+            store.kv_set("active_strategy", old)
+
+
+def _verdict_input():
+    return {"symbol": "TCS", "name": "TCS", "data_date": "2026-11-26",
+            "fetched_at": "2026-11-26T16:00:00+05:30", "passes_base": True, "signals_fired": [],
+            "regime": {"state": "ON"},
+            "plan": {"signal_close": 1005.0, "buy_zone": [990.0, 1010.0], "no_chase_above": 1020.0,
+                     "stop": 950.0, "target1": 1075.0, "target2": 1150.0,
+                     "t1_days_median": 16, "t2_days_median": 28, "blocked": [],
+                     "indicators": {"sma20": 995.0, "sma50": 970.0, "sma200": 900.0, "hi252": 1030.0, "rsi2": 25.0},
+                     "company": {"results": {}, "shareholding": {}, "warnings": [], "positives": []},
+                     "company_facts": []}}
+
+
+def test_verdict_avoid_on_hard_block():
+    a = _verdict_input()
+    a["plan"]["blocked"] = ["ASM surveillance from 2026-11-20"]
+    v = verdict.verdict(a)
+    assert v["verdict"] == "AVOID" and "ASM surveillance" in v["text"] and "2026-11-26" in v["reasons"][0]
+
+
+def test_verdict_exit_on_stop_hit():
+    a = _verdict_input()
+    a["call"] = {"status": "open", "stop": 950.0, "last_price": 940.0}
+    a["call_events"] = []
+    v = verdict.verdict(a)
+    assert v["verdict"] == "EXIT" and "940.00" in v["text"]
+
+
+def test_verdict_exit_on_redflag_event():
+    a = _verdict_input()
+    a["call"] = {"status": "open", "stop": 950.0, "last_price": 1000.0}
+    a["call_events"] = [{"kind": "redflag", "message": "Auditor resignation filed 2026-11-25"}]
+    v = verdict.verdict(a)
+    assert v["verdict"] == "EXIT" and "Auditor resignation" in v["text"]
+
+
+def test_verdict_hold_on_open_call():
+    a = _verdict_input()
+    a["call"] = {"status": "open", "stop": 950.0, "last_price": 1000.0}
+    v = verdict.verdict(a)
+    assert v["verdict"] == "HOLD" and "not reached" in v["text"] and v["horizon"] == "short term"
+
+
+def test_verdict_buy_on_signal():
+    a = _verdict_input()
+    a["signals_fired"] = ["S2"]
+    v = verdict.verdict(a)
+    assert v["verdict"] == "BUY" and "52-week-high breakout" in v["text"]
+    assert "16 sessions to T1" in v["expected_duration"] and "28 to T2" in v["expected_duration"]
+
+
+def test_verdict_wait_without_signal():
+    v = verdict.verdict(_verdict_input())
+    assert v["verdict"] == "WAIT" and "no strategy signal today" in v["text"]
+
+
+def test_verdict_long_term_line():
+    v = verdict.verdict(_verdict_input())
+    assert v["long_term"] == "long term: trend intact, review quarterly"
+    assert "long term: trend intact, review quarterly" in v["text"] and "short term:" in v["text"]
+    a = _verdict_input()
+    a["plan"]["company"]["warnings"] = ["Promoter pledge 6%"]
+    assert verdict.verdict(a)["long_term"] == "long term: not a candidate"
+    assert verdict.verdict(a)["text"].endswith(verdict.DISCLAIMER)
+
+
+def test_bare_symbol_routes_to_verdict_without_llm(monkeypatch):
+    a = _verdict_input()
+    a["signals_fired"] = ["S2"]
+    monkeypatch.setattr(analysis, "resolve_symbol", lambda text: "TCS")
+    monkeypatch.setattr(analysis, "analyse", lambda sym: a)
+    monkeypatch.setattr(chat.llm, "enabled", lambda: True)
+    def forbidden(*args, **kwargs):
+        raise AssertionError("LLM must not decide or write the verdict for a bare symbol")
+    monkeypatch.setattr(chat.llm, "ask", forbidden)
+    out = chat._route("TCS")
+    assert out["verdict"]["verdict"] == "BUY" and out["text"].startswith("TCS (TCS) - BUY")
+    assert "not investment advice" in out["text"]
+
+
+def test_slash_alone_returns_help():
+    assert chat._route("/")["text"] == chat.HELP
+    assert "Things you can ask" in chat._route("/help")["text"]
+
+
+def test_verdict_avoid_has_no_duration_and_large_amounts_in_crore():
+    a = _verdict_input()
+    a["plan"]["blocked"] = ["ASM surveillance from 2026-11-20"]
+    v = verdict.verdict(a)
+    assert "sessions" not in v["text"].split("\n")[0]
+    assert "· no trade" in v["text"].split("\n")[0]
+    assert verdict._crore(731_880_000_000) == "Rs 73,188.00 Cr"
+    assert verdict._crore(12_500_000) == "Rs 1.25 Cr"
+    assert verdict._crore(950) == "Rs 950.00"
+    assert verdict._crore(None) == "data missing"

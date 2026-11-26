@@ -31,7 +31,11 @@
     <div class="chat">
       <div id="chatlog" class="chatlog" role="log" aria-live="polite" aria-label="Chat messages"></div>
       <form id="chatform" class="chatform">
-        <input id="chatin" autocomplete="off" aria-label="Message" placeholder='Try: "analyse TCS", "pdf today", "average", "help"'>
+        <div class="chatinwrap">
+          <input id="chatin" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="cmdmenu"
+                 aria-label="Message" placeholder='Try: "TCS", "analyse TCS", "pdf today", "/" for commands'>
+          <div id="cmdmenu" class="cmdmenu hidden" role="listbox" aria-label="Chat commands"></div>
+        </div>
         <button type="submit" class="btn primary">Send</button>
       </form>
     </div>
